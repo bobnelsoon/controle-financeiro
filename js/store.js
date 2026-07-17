@@ -1,0 +1,318 @@
+// Persistência (localStorage) + modelo de dados + dados iniciais importados da planilha
+"use strict";
+
+const Store = (() => {
+  const KEY = "controle-financeiro-v1";
+  let state = null;
+
+  // ---------- Dados iniciais (importados de "1-Controle Financeiro 2026 Official 1207.xlsx") ----------
+  // A versão publicada na internet define window.SEED_VAZIO = true e começa sem nenhum dado:
+  // tudo chega pela sincronização (os dados pessoais não vão no código publicado).
+  function seedVazio() {
+    return {
+      version: 4,
+      settings: { anoInicial: 2026, conta: null },
+      categories: categoriasPadrao(),
+      accounts: [],
+      flowItems: [],
+      flowCells: {},
+      transactions: [],
+      loans: [],
+      budgets: {},
+      cardTx: [],
+      investments: { assets: [], fixed: [], quotes: {}, history: [] }
+    };
+  }
+
+  function categoriasPadrao() {
+    return [
+      { id: "sal",     name: "Salário" },
+      { id: "alugueis", name: "Aluguéis" },
+      { id: "empfeitos", name: "Empréstimos concedidos" },
+      { id: "moradia", name: "Moradia" },
+      { id: "contas",  name: "Contas & Serviços" },
+      { id: "saude",   name: "Saúde" },
+      { id: "cartao",  name: "Cartão de Crédito" },
+      { id: "invest",  name: "Investimentos" },
+      { id: "impostos", name: "Impostos" },
+      { id: "transporte", name: "Transporte" },
+      { id: "mercado", name: "Mercado" },
+      { id: "lazer",   name: "Lazer" },
+      { id: "outros",  name: "Outros" }
+    ];
+  }
+
+  function seed() { return seedVazio(); }
+
+  // ---------- Importação da aba "Cartão 2026" ----------
+  const CARD_NAME_MAP = { "C6": "banco c6", "ITAU": "itau", "MERCADO PAGO": "mercado pago", "SANTANDER": "santander", "AMAZOM": "amazon", "SICOOB": "sicoob" };
+
+  function normName(s) {
+    return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  }
+
+  function findAccountByCardName(accounts, cardName) {
+    const alvo = CARD_NAME_MAP[cardName] || normName(cardName);
+    let acc = accounts.find(a => normName(a.name) === alvo);
+    if (!acc) acc = accounts.find(a => normName(a.name).includes(alvo) || alvo.includes(normName(a.name)));
+    return acc || null;
+  }
+
+  function buildCardTx(accounts) {
+    if (typeof CARTAO_IMPORT === "undefined") return [];
+    const txs = [];
+    for (const [ym, card, desc, value, date] of CARTAO_IMPORT) {
+      let acc = findAccountByCardName(accounts, card);
+      if (!acc) {
+        acc = { id: U.id(), name: card, type: "cartao", dueDay: null, limit: null };
+        accounts.push(acc);
+      }
+      txs.push({ id: U.id(), ym, accountId: acc.id, desc, value, date: date || null });
+    }
+    return txs;
+  }
+
+  // Dias de vencimento/recebimento informados pelo usuário (16/07/2026)
+  const DIAS_VENCIMENTO = {};
+
+  function aplicarDiasVencimento(items) {
+    for (const it of items) {
+      if (DIAS_VENCIMENTO[it.name] != null && it.dueDay == null) it.dueDay = DIAS_VENCIMENTO[it.name];
+    }
+  }
+
+  // Migra dados salvos de versões anteriores sem perder edições do usuário
+  function migrate(st) {
+    if (!st.version || st.version < 2) {
+      st.settings.conta = st.settings.conta || null;
+      // marca o item da fatura como automático e remove os valores fixos futuros
+      const itCartao = st.flowItems.find(i => i.name === "Cartão (fatura)");
+      if (itCartao) {
+        itCartao.autoCartao = true;
+        itCartao.note = "Somado automaticamente da tela Cartões";
+        for (const ymStr of ["2026-08", "2026-09", "2026-10", "2026-11", "2026-12"]) {
+          const k = itCartao.id + "|" + ymStr;
+          const c = st.flowCells[k];
+          if (c && c.value != null && !c.status) delete st.flowCells[k];
+        }
+      }
+      if (!st.cardTx) st.cardTx = buildCardTx(st.accounts);
+      st.version = 2;
+    }
+    if (st.version < 3) {
+      if (!st.investments) st.investments = seedInvestments();
+      st.version = 3;
+    }
+    if (st.version < 4) {
+      aplicarDiasVencimento(st.flowItems);
+      // cartões: todos vencem dia 1 (informado pelo usuário)
+      for (const a of st.accounts) if (a.type === "cartao") a.dueDay = 1;
+      st.version = 4;
+    }
+    return st;
+  }
+
+  // ---------- Persistência ----------
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) { state = migrate(JSON.parse(raw)); save(); return; }
+    } catch (e) { console.error("Erro lendo dados salvos:", e); }
+    state = seed();
+    save();
+  }
+
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    if (typeof Sync !== "undefined") Sync.onLocalSave(); // agenda envio para o outro aparelho
+  }
+
+  // ---------- Fluxo anual ----------
+  function inRangeRaw(item, ymStr) {
+    if (item.startMonth && U.ymCmp(ymStr, item.startMonth) < 0) return false;
+    if (item.endMonth && U.ymCmp(ymStr, item.endMonth) > 0) return false;
+    return true;
+  }
+
+  function getCell(itemId, ymStr) { return state.flowCells[itemId + "|" + ymStr] || null; }
+
+  function setCell(itemId, ymStr, data) {
+    const k = itemId + "|" + ymStr;
+    if (!data || (data.value == null && !data.status && !data.note)) delete state.flowCells[k];
+    else state.flowCells[k] = data;
+    save();
+  }
+
+  // ---------- Fatura de cartão (lançamentos da tela Cartões) ----------
+  function cardTxDoMes(ymStr, accountId) {
+    return (state.cardTx || []).filter(t => t.ym === ymStr && (!accountId || t.accountId === accountId));
+  }
+  function faturaTotal(ymStr, accountId) {
+    return cardTxDoMes(ymStr, accountId).reduce((s, t) => s + t.value, 0);
+  }
+  function addCardTx(tx) { state.cardTx.push(tx); save(); }
+  function removeCardTx(id) { state.cardTx = state.cardTx.filter(t => t.id !== id); save(); }
+
+  // Valor automático do item "Cartão (fatura)": total da fatura do mês, negativo
+  function autoCartaoValue(ymStr) {
+    const tot = faturaTotal(ymStr, null);
+    return tot !== 0 ? -Math.round(tot * 100) / 100 : null;
+  }
+
+  // Valor planejado do mês (ignora status) — usado no painel do mês
+  function plannedValue(item, ymStr) {
+    const c = getCell(item.id, ymStr);
+    if (c && c.value != null) return c.value;
+    if (item.autoCartao) {
+      const v = autoCartaoValue(ymStr);
+      if (v != null) return v;
+    }
+    if (!inRangeRaw(item, ymStr)) return null;
+    return item.defaultValue;
+  }
+
+  // Valor para projeção de saldo: célula PAGO/RECEBIDO sem valor vale 0 (igual à planilha)
+  function projectedValue(item, ymStr) {
+    const c = getCell(item.id, ymStr);
+    if (c && c.value != null) return c.value;
+    if (c && c.status && c.status !== "PENDENTE") return 0;
+    if (item.autoCartao) {
+      const v = autoCartaoValue(ymStr);
+      if (v != null) return v;
+    }
+    if (!inRangeRaw(item, ymStr)) return null;
+    return item.defaultValue;
+  }
+
+  function monthTotal(ymStr, fn) {
+    let t = 0;
+    for (const it of state.flowItems) {
+      const v = (fn || projectedValue)(it, ymStr);
+      if (v != null) t += v;
+    }
+    return t;
+  }
+
+  // Saldo acumulado.
+  // Se o usuário informou o saldo em conta (settings.conta = {ym, valor}), a projeção
+  // parte desse valor real: saldo(mês âncora) = valor informado + pendências do próprio mês.
+  // Sem âncora, acumula do zero desde o anoInicial (comportamento da planilha).
+  function saldoSerie(ano) {
+    const anchor = state.settings.conta;
+    const serie = [];
+    let s = 0;
+    let cur = U.ym(state.settings.anoInicial, 1);
+    const fim = U.ym(ano, 12);
+    while (U.ymCmp(cur, fim) <= 0) {
+      if (anchor && anchor.ym === cur) s = anchor.valor;
+      s += monthTotal(cur);
+      if (U.ymParse(cur).y === ano) serie.push({ ym: cur, saldo: s });
+      cur = U.ymAdd(cur, 1);
+    }
+    return serie;
+  }
+
+  function saldoAcumuladoAte(ymStr) {
+    const { y } = U.ymParse(ymStr);
+    const serie = saldoSerie(y);
+    const p = serie.find(p => p.ym === ymStr);
+    return p ? p.saldo : 0;
+  }
+
+  // ---------- Lançamentos ----------
+  function addTransaction(tx) { state.transactions.push(tx); save(); }
+  function removeTransaction(id) {
+    state.transactions = state.transactions.filter(t => t.id !== id);
+    save();
+  }
+  function txDoMes(ymStr) {
+    return state.transactions
+      .filter(t => t.date && t.date.slice(0, 7) === ymStr)
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+  }
+
+  // ---------- Despesas por categoria (fluxo planejado + lançamentos) ----------
+  function despesasPorCategoria(ymStr) {
+    const mapa = {};
+    for (const it of state.flowItems) {
+      if (it.kind !== "despesa") continue;
+      const v = plannedValue(it, ymStr);
+      if (v != null && v < 0) mapa[it.categoryId] = (mapa[it.categoryId] || 0) + Math.abs(v);
+    }
+    for (const t of txDoMes(ymStr)) {
+      if (t.value < 0) mapa[t.categoryId || "outros"] = (mapa[t.categoryId || "outros"] || 0) + Math.abs(t.value);
+    }
+    return mapa;
+  }
+
+  function catName(id) {
+    const c = state.categories.find(c => c.id === id);
+    return c ? c.name : "Sem categoria";
+  }
+  function accName(id) {
+    const a = state.accounts.find(a => a.id === id);
+    return a ? a.name : "—";
+  }
+
+  // ---------- Investimentos ----------
+  function inv() { return state.investments; }
+
+  function rvTotal() {
+    let t = 0;
+    for (const a of inv().assets) {
+      const q = inv().quotes[a.ticker];
+      if (q) t += q.price * a.qty;
+    }
+    return t;
+  }
+  function rfTotal() {
+    return inv().fixed.reduce((s, f) => s + (f.value || 0), 0);
+  }
+
+  // Guarda cotações novas e registra o snapshot do dia no histórico
+  function saveQuotes(mapa) {
+    Object.assign(inv().quotes, mapa);
+    const hoje = U.hojeISO();
+    const rv = rvTotal(), rf = rfTotal();
+    const snap = { date: hoje, rv: Math.round(rv * 100) / 100, rf: Math.round(rf * 100) / 100, total: Math.round((rv + rf) * 100) / 100 };
+    const idx = inv().history.findIndex(h => h.date === hoje);
+    if (idx >= 0) inv().history[idx] = snap; else inv().history.push(snap);
+    if (inv().history.length > 730) inv().history = inv().history.slice(-730);
+    save();
+  }
+
+  // Aportes do ano: soma do item de fluxo cujo nome contém "invest" (valores negativos = dinheiro aplicado)
+  function aportesDoAno(ano) {
+    let t = 0;
+    for (const it of state.flowItems) {
+      if (it.kind !== "despesa" || !/invest/i.test(it.name)) continue;
+      for (let m = 1; m <= 12; m++) {
+        const v = plannedValue(it, U.ym(ano, m));
+        if (v != null && v < 0) t += Math.abs(v);
+      }
+    }
+    return t;
+  }
+
+  // ---------- Exportar / importar ----------
+  function exportJSON() { return JSON.stringify(state, null, 2); }
+  function importJSON(txt) {
+    const obj = JSON.parse(txt);
+    if (!obj || !Array.isArray(obj.flowItems)) throw new Error("Arquivo não parece um backup válido.");
+    state = migrate(obj);
+    save();
+  }
+  function resetAll() { state = seed(); save(); }
+
+  return {
+    get state() { return state; },
+    load, save, seed,
+    inRangeRaw, getCell, setCell, plannedValue, projectedValue,
+    monthTotal, saldoAcumuladoAte, saldoSerie,
+    addTransaction, removeTransaction, txDoMes,
+    cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
+    inv, rvTotal, rfTotal, saveQuotes, aportesDoAno,
+    despesasPorCategoria, catName, accName,
+    exportJSON, importJSON, resetAll
+  };
+})();
