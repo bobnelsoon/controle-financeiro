@@ -110,9 +110,10 @@ const Sync = (() => {
     return "enviado";
   }
 
-  // Chamado pelo Store a cada save(): agenda um envio (com pausa para agrupar edições)
+  // Chamado pelo Store a cada save(): agenda um envio (com pausa para agrupar edições).
+  // Um aparelho sem dados nunca envia automaticamente — evita apagar o cofre por engano.
   function onLocalSave() {
-    if (!ativo() || aplicandoRemoto) return;
+    if (!ativo() || aplicandoRemoto || !temDados(Store.state)) return;
     cfg.lastChange = Date.now();
     saveCfg();
     clearTimeout(timer);

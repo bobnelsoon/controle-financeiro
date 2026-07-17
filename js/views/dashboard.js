@@ -62,6 +62,9 @@ const ViewDashboard = (() => {
       <div class="page-head">
         <h1>Dashboard</h1>
         <span class="muted">${U.MESES[mes - 1]} de ${ano}</span>
+        <div class="spacer"></div>
+        <span class="muted" id="dash-sync-info" style="font-size:11.5px">${typeof Sync !== "undefined" ? U.esc(Sync.statusTexto()) : ""}</span>
+        <button class="btn-primary" id="btn-atualizar">🔄 Atualizar</button>
       </div>
       <div class="cards-grid">
         <div class="card stat">
@@ -108,6 +111,34 @@ const ViewDashboard = (() => {
         <h2 class="section">Despesas por categoria — ${U.MESES[mes - 1]}</h2>
         <div id="chart-cat"></div>
       </div>`;
+
+    // 🔄 Atualizar tudo: sincroniza com o cofre + busca cotações + recalcula as telas
+    root.querySelector("#btn-atualizar").addEventListener("click", async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      const avisos = [];
+      try {
+        if (typeof Sync !== "undefined" && Sync.ativo()) {
+          btn.textContent = "Sincronizando...";
+          try {
+            const acao = await Sync.sincronizar();
+            if (acao === "baixado") avisos.push("dados mais novos baixados do cofre");
+          } catch (err) { avisos.push("sincronização falhou: " + err.message); }
+        }
+        const tickers = Store.inv().assets.map(a => a.ticker);
+        if (tickers.length) {
+          btn.textContent = "Buscando cotações...";
+          try {
+            const { ok, falhas } = await Quotes.fetchAll(tickers);
+            if (Object.keys(ok).length) Store.saveQuotes(ok);
+            if (falhas.length) avisos.push("sem cotação para: " + falhas.join(", "));
+          } catch (err) { avisos.push("cotações falharam: " + err.message); }
+        }
+      } finally {
+        App.render();
+        if (avisos.length) alert("Atualizado com avisos:\n• " + avisos.join("\n• "));
+      }
+    });
 
     root.querySelector("#btn-edit-conta").addEventListener("click", () => {
       UI.modal("Saldo em conta corrente", `
