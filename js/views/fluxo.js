@@ -192,18 +192,21 @@ const ViewFluxo = (() => {
     body.appendChild(U.el(`<tr class="grupo"><td>DESPESAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of despesas) body.appendChild(linhaItem(it, meses, ymAtual));
 
-    // Totais
+    // Totais — mesma base do Dashboard (Store.resultadoMes), para os números baterem.
     const trTotal = U.el(`<tr class="total"><td>Resultado do mês</td></tr>`);
     for (const mm of meses) {
-      const t = Store.monthTotal(mm);
+      const t = Store.resultadoMes(mm);
       trTotal.appendChild(U.el(`<td class="num ${U.clsValor(t)}" style="text-align:right">${t.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>`));
     }
     body.appendChild(trTotal);
 
-    const serie = Store.saldoSerie(ano);
+    // Saldo acumulado — projeção ancorada no saldo real da conta (igual ao "Acumulado do
+    // mês" do dashboard no mês atual). Meses já realizados ficam em branco.
+    const serie = Store.saldoAcumuladoSerie(ano);
     const trSaldo = U.el(`<tr class="total"><td>Saldo acumulado</td></tr>`);
     for (const p of serie) {
-      trSaldo.appendChild(U.el(`<td class="num ${U.clsValor(p.saldo)}" style="text-align:right">${p.saldo.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>`));
+      const txt = p.saldo == null ? "" : p.saldo.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+      trSaldo.appendChild(U.el(`<td class="num ${p.saldo == null ? "" : U.clsValor(p.saldo)}" style="text-align:right">${txt}</td>`));
     }
     body.appendChild(trSaldo);
   }

@@ -26,7 +26,8 @@ const ViewDashboard = (() => {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
     }
     despesas -= gastoCartao; // inclui o gasto real do cartão como despesa do mês
-    const saldoMes = receitas + despesas;
+    // Resultado do mês vem da fonte única do Store (mesma usada no Fluxo Anual).
+    const saldoMes = Store.resultadoMes(ymAtual);
     const serie = Store.saldoProjecaoSerie();
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
