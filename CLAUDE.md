@@ -122,7 +122,21 @@ Pontos de atenção conhecidos:
   entre eles. Se o usuário cadastrar a mesma coisa nos dois lugares, aparece duplicado (foi o caso do
   "Carro Taiara" × "Taiara — parcela 28", resolvido pelo usuário apagando o item de fluxo). É dado do
   usuário; o agente não acessa/edita (vive no localStorage/Gist).
-- Nenhuma tarefa de implementação pendente confirmada. Aguardar o usuário validar os valores no app.
+
+- **PENDENTE — validar o Acumulado com os dados reais.** O usuário reportou que, mesmo abrindo o link
+  atualizado, o Acumulado de Julho não veio 7.900 como ele esperava. Diagnóstico em aberto (aguardando
+  print do Dashboard ou backup):
+  1. **Publicação está OK.** GitHub Pages publica da `main` (sem workflow próprio; runs "pages build and
+     deployment" com sucesso). O `index.html` **não tem `?v=`**, então o navegador/CDN pode servir um
+     `index.html` em cache que aponta pros arquivos antigos → parece que "não subiu". Solução do lado do
+     usuário: abrir com `?v=8` no fim da URL, recarregar forte, ou limpar dados do site (isso apaga o
+     localStorage — restaurar via Configurações → Sincronização/Importar). **Ideia de melhoria futura:**
+     fazer o `index.html` recarregar os assets sozinho / evitar esse cache do HTML.
+  2. **Ou o cálculo:** `Acumulado = saldoProjecaoSerie()[0]` só é igual ao saldo se **todos** os itens
+     de Julho estiverem Pago/Recebido (`monthTotal(Julho)=0`). Se sobrar item pendente em Julho no dado
+     real, o Acumulado projeta esse pendente e legitimamente difere do saldo. Confirmar com o backup.
+  - Como saber se a versão nova carregou: o subtítulo do quadro Acumulado deve ser
+    "saldo previsto na conta no fim do mês" (versão antiga dizia "saldo em conta + resultado do mês").
 
 Testes headless ficam em `scratchpad/` (build.mjs gera `preview-demo.html` com dados fake +
 `window.Store`; test*.mjs dirigem via Playwright servindo por `python3 -m http.server`). Nunca subir
