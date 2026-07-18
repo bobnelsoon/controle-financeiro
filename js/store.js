@@ -110,10 +110,11 @@ const Store = (() => {
       st.version = 4;
     }
     if (st.version < 5) {
-      // O saldo em conta passa a ser atualizado automaticamente: guarda o instante (at) em que
-      // foi informado e soma tudo que foi realizado depois (itens Pago/Recebido + lançamentos pix).
-      if (st.settings.conta && st.settings.conta.ym && !st.settings.conta.at) {
-        st.settings.conta.at = st.settings.conta.ym + "-01T00:00:00.000Z";
+      // O saldo em conta passa a ser atualizado automaticamente. O valor já informado é tratado
+      // como "atual no momento da atualização": só movimentos NOVOS (Pago/Recebido e lançamentos
+      // pix feitos daqui pra frente) mexem no saldo — nada do histórico é reaplicado retroativamente.
+      if (st.settings.conta && st.settings.conta.valor != null && !st.settings.conta.at) {
+        st.settings.conta.at = new Date().toISOString();
       }
       for (const t of (st.transactions || [])) {
         if (!t.createdAt) t.createdAt = (t.date || U.hojeISO()) + "T12:00:00.000Z";
