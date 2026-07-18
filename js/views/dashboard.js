@@ -32,9 +32,10 @@ const ViewDashboard = (() => {
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Acumulado do mês = saldo em conta atual + resultado do mês (receitas − despesas).
-    // É o que sobra na conta depois de receber e pagar tudo do mês.
-    const acumulado = saldoConta != null ? Math.round((saldoConta + saldoMes) * 100) / 100 : null;
+    // Acumulado do mês = saldo previsto na conta no fim do mês. Parte do saldo atual e soma
+    // só o que ainda falta (itens já Pagos/Recebidos contam 0, pois já estão no saldo). Assim,
+    // com tudo quitado no mês, o Acumulado é igual ao próprio saldo em conta — sem contar em dobro.
+    const acumulado = saldoConta != null && serie.length ? serie[0].saldo : null;
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
     // Próximos vencimentos: do mês atual até dezembro, agrupados por mês.
@@ -121,7 +122,7 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Acumulado do mês</div>
           <div class="stat-value num ${U.clsValor(acumulado)}">${U.brl(acumulado)}</div>
-          <div class="stat-sub">saldo em conta + resultado do mês</div>
+          <div class="stat-sub">saldo previsto na conta no fim do mês</div>
         </div>` : ""}
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Saldo projetado (Dez/${ano})</div>

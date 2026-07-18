@@ -318,11 +318,12 @@ const Store = (() => {
     return Math.round(r * 100) / 100;
   }
 
-  // Saldo acumulado projetado — parte do saldo real da conta HOJE e projeta mês a mês
-  // somando o resultadoMes (mesma base do dashboard). O mês atual fecha em
-  // saldoContaAtual + resultadoMes(mês atual), idêntico ao "Acumulado do mês" do dashboard.
-  // Meses anteriores ao atual ficam vazios (já realizados, embutidos no saldo em conta).
-  // Sem saldo em conta informado, cai no saldoSerie antigo (estilo planilha).
+  // Saldo acumulado projetado — parte do saldo real da conta HOJE e projeta mês a mês,
+  // somando só o que ainda falta (projectedValue: itens já Pagos/Recebidos contam 0, pois
+  // já estão embutidos no saldo em conta). Mesma projeção do dashboard (saldoProjecaoSerie),
+  // então o mês atual fecha idêntico ao "Acumulado do mês". Com tudo quitado no mês, o
+  // acumulado é igual ao próprio saldo em conta. Meses já realizados (antes do atual) ficam
+  // vazios. Sem saldo em conta informado, cai no saldoSerie antigo (estilo planilha).
   function saldoAcumuladoSerie(ano) {
     const base = saldoContaAtual();
     if (base == null) return saldoSerie(ano);
@@ -332,7 +333,7 @@ const Store = (() => {
     let s = base;
     let cur = start;
     while (U.ymCmp(cur, fimAno) <= 0) {
-      s = Math.round((s + resultadoMes(cur)) * 100) / 100;
+      s = Math.round((s + monthTotal(cur)) * 100) / 100;
       map[cur] = s;
       cur = U.ymAdd(cur, 1);
     }
