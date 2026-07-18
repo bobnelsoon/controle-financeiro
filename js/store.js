@@ -300,6 +300,50 @@ const Store = (() => {
     return p ? p.saldo : 0;
   }
 
+  // Resultado do mês — FONTE ÚNICA usada pelo Dashboard e pelo Fluxo Anual, para os dois
+  // sempre baterem. Receitas − despesas em valores cheios (ignora status Pago/Recebido):
+  // itens fixos do fluxo + lançamentos avulsos do mês + gasto do cartão do mês.
+  // O gasto do cartão do mês é a fatura vigente = a fatura paga no mês SEGUINTE
+  // (ymAdd(ymStr, 1)), porque a compra de um mês vira fatura no mês seguinte.
+  // O item automático "Cartão (fatura)" é ignorado para não contar a fatura em dobro.
+  function resultadoMes(ymStr) {
+    let r = 0;
+    for (const it of state.flowItems) {
+      if (it.autoCartao) continue;
+      const v = plannedValue(it, ymStr);
+      if (v != null) r += v;
+    }
+    for (const t of txDoMes(ymStr)) r += t.value;
+    r -= faturaTotal(U.ymAdd(ymStr, 1), null);
+    return Math.round(r * 100) / 100;
+  }
+
+  // Saldo acumulado projetado — parte do saldo real da conta HOJE e projeta mês a mês
+  // somando o resultadoMes (mesma base do dashboard). O mês atual fecha em
+  // saldoContaAtual + resultadoMes(mês atual), idêntico ao "Acumulado do mês" do dashboard.
+  // Meses anteriores ao atual ficam vazios (já realizados, embutidos no saldo em conta).
+  // Sem saldo em conta informado, cai no saldoSerie antigo (estilo planilha).
+  function saldoAcumuladoSerie(ano) {
+    const base = saldoContaAtual();
+    if (base == null) return saldoSerie(ano);
+    const start = U.ymHoje();
+    const fimAno = U.ym(ano, 12);
+    const map = {};
+    let s = base;
+    let cur = start;
+    while (U.ymCmp(cur, fimAno) <= 0) {
+      s = Math.round((s + resultadoMes(cur)) * 100) / 100;
+      map[cur] = s;
+      cur = U.ymAdd(cur, 1);
+    }
+    const serie = [];
+    for (let m = 1; m <= 12; m++) {
+      const ym = U.ym(ano, m);
+      serie.push({ ym, saldo: map[ym] != null ? map[ym] : null });
+    }
+    return serie;
+  }
+
   // ---------- Lançamentos ----------
   function addTransaction(tx) {
     if (!tx.createdAt) tx.createdAt = new Date().toISOString();
@@ -410,6 +454,7 @@ const Store = (() => {
     load, save, seed,
     inRangeRaw, getCell, setCell, plannedValue, projectedValue, effectiveCellValue,
     monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
+    resultadoMes, saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
