@@ -90,10 +90,6 @@ body {
 .stat .stat-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .stat .stat-value { font-size: 22px; font-weight: 700; }
 .stat .stat-sub { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
-.stat .stat-extra { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-.stat .stat-extra > span { color: var(--muted); font-size: 12px; }
-.stat .stat-extra > b { font-size: 15px; white-space: nowrap; }
 .card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; }
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
 .card.clickable .btn-sm { cursor: pointer; }
