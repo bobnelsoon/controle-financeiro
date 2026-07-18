@@ -44,13 +44,26 @@ const ViewInvestimentos = (() => {
         <select name="tipo"><option value="acao">Ação</option><option value="fii">FII</option></select></label>
       <label class="fld"><span>Quantidade de cotas</span>
         <input type="number" name="qty" required min="1" step="1" value="1"></label>
+      <label class="fld"><span>Preço pago por cota (R$)</span>
+        <input type="text" name="preco" inputmode="decimal" placeholder="ex.: 98,50"></label>
+      <p class="muted" style="font-size:12px">O preço pago é usado para calcular seu ganho/perda. Se você já tem
+      esse ativo, informamos a média ponderada entre o que já tinha e esta nova compra.</p>
     `, (form) => {
       const ticker = form.ticker.value.trim().toUpperCase();
       const qty = Number(form.qty.value);
+      const preco = U.parseMoney(form.preco.value);
       if (!ticker || !qty) return false;
       const existente = Store.inv().assets.find(a => a.ticker === ticker);
-      if (existente) existente.qty += qty;
-      else Store.inv().assets.push({ id: U.id(), ticker, type: form.tipo.value, qty });
+      if (existente) {
+        // preço médio ponderado entre a posição atual e a nova compra
+        if (preco != null) {
+          const antigo = existente.avgPrice != null ? existente.avgPrice : preco;
+          existente.avgPrice = Math.round(((antigo * existente.qty + preco * qty) / (existente.qty + qty)) * 100) / 100;
+        }
+        existente.qty += qty;
+      } else {
+        Store.inv().assets.push({ id: U.id(), ticker, type: form.tipo.value, qty, avgPrice: preco });
+      }
       Store.save();
       App.render();
       atualizarCotacoes();
@@ -61,11 +74,14 @@ const ViewInvestimentos = (() => {
     UI.modal("Editar " + a.ticker, `
       <label class="fld"><span>Quantidade de cotas</span>
         <input type="number" name="qty" required min="0" step="1" value="${a.qty}"></label>
+      <label class="fld"><span>Preço médio pago por cota (R$)</span>
+        <input type="text" name="preco" inputmode="decimal"
+          value="${a.avgPrice != null ? String(a.avgPrice).replace(".", ",") : ""}" placeholder="ex.: 98,50"></label>
       <p class="muted" style="font-size:12px">Quantidade 0 remove o ativo da carteira.</p>
     `, (form) => {
       const qty = Number(form.qty.value);
-      if (qty <= 0) Store.inv().assets = Store.inv().assets.filter(x => x.id !== a.id);
-      else a.qty = qty;
+      if (qty <= 0) { Store.inv().assets = Store.inv().assets.filter(x => x.id !== a.id); }
+      else { a.qty = qty; a.avgPrice = U.parseMoney(form.preco.value); }
       Store.save();
       App.render();
     });
@@ -144,8 +160,8 @@ const ViewInvestimentos = (() => {
           <h2 class="section" style="margin:0">Ações & FIIs</h2>
           <button class="btn-sm" id="btn-ativo">+ Ativo</button>
         </div>
-        <table class="tbl mt">
-          <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço</th><th class="num">Hoje</th><th class="num">Total</th><th></th></tr></thead>
+        <table class="tbl tbl-wide mt">
+          <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço pago</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
           <tbody id="rv-body"></tbody>
         </table>
       </div>
@@ -178,16 +194,26 @@ const ViewInvestimentos = (() => {
         varDia = (pct >= 0 ? "+" : "") + pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
         varCls = pct > 0 ? "pos" : pct < 0 ? "neg" : "muted";
       }
+      // Ganho/perda em relação ao preço médio pago
+      let ganhoTxt = "—", ganhoCls = "muted";
+      if (q && a.avgPrice != null && a.avgPrice > 0) {
+        const ganho = (q.price - a.avgPrice) * a.qty;
+        const ganhoPct = (q.price / a.avgPrice - 1) * 100;
+        ganhoTxt = `${U.brl(ganho)}<div class="muted" style="font-size:11px">${(ganhoPct >= 0 ? "+" : "") + ganhoPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div>`;
+        ganhoCls = ganho > 0 ? "pos" : ganho < 0 ? "neg" : "muted";
+      }
       const tr = U.el(`
         <tr>
           <td><b>${U.esc(a.ticker)}</b>${q && q.name ? `<div class="muted" style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(q.name)}</div>` : ""}</td>
           <td><span class="tag">${TIPO_LABEL[a.type] || a.type}</span></td>
           <td class="num">${a.qty}</td>
+          <td class="num">${a.avgPrice != null ? U.brl(a.avgPrice) : "—"}</td>
           <td class="num">${q ? U.brl(q.price) : "—"}</td>
           <td class="num ${varCls}">${varDia}</td>
+          <td class="num ${ganhoCls}">${ganhoTxt}</td>
           <td class="num"><b>${totalAtivo != null ? U.brl(totalAtivo) : "—"}</b></td>
           <td style="white-space:nowrap">
-            <button class="btn-sm ed" title="Editar quantidade">✎</button>
+            <button class="btn-sm ed" title="Editar ativo">✎</button>
             <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
           </td>
         </tr>`);
@@ -201,7 +227,7 @@ const ViewInvestimentos = (() => {
       });
       rvBody.appendChild(tr);
     }
-    if (!inv.assets.length) rvBody.innerHTML = `<tr><td colspan="7" class="empty">Nenhum ativo. Clique em "+ Ativo".</td></tr>`;
+    if (!inv.assets.length) rvBody.innerHTML = `<tr><td colspan="9" class="empty">Nenhum ativo. Clique em "+ Ativo".</td></tr>`;
 
     // Renda fixa
     const rfList = root.querySelector("#rf-list");

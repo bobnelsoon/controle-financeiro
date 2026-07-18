@@ -10,7 +10,7 @@ const Store = (() => {
   // tudo chega pela sincronização (os dados pessoais não vão no código publicado).
   function seedVazio() {
     return {
-      version: 4,
+      version: 5,
       settings: { anoInicial: 2026, conta: null },
       categories: categoriasPadrao(),
       accounts: [],
@@ -109,6 +109,22 @@ const Store = (() => {
       for (const a of st.accounts) if (a.type === "cartao") a.dueDay = 1;
       st.version = 4;
     }
+    if (st.version < 5) {
+      // O saldo em conta passa a ser atualizado automaticamente. O valor já informado é tratado
+      // como "atual no momento da atualização": só movimentos NOVOS (Pago/Recebido e lançamentos
+      // pix feitos daqui pra frente) mexem no saldo — nada do histórico é reaplicado retroativamente.
+      if (st.settings.conta && st.settings.conta.valor != null && !st.settings.conta.at) {
+        st.settings.conta.at = new Date().toISOString();
+      }
+      for (const t of (st.transactions || [])) {
+        if (!t.createdAt) t.createdAt = (t.date || U.hojeISO()) + "T12:00:00.000Z";
+      }
+      // Ativos ganham "preço médio pago" para calcular ganho/perda
+      if (st.investments && st.investments.assets) {
+        for (const a of st.investments.assets) if (a.avgPrice === undefined) a.avgPrice = null;
+      }
+      st.version = 5;
+    }
     return st;
   }
 
@@ -136,10 +152,28 @@ const Store = (() => {
 
   function getCell(itemId, ymStr) { return state.flowCells[itemId + "|" + ymStr] || null; }
 
+  // Valor efetivamente movimentado por uma célula (usa o valor informado, o automático do
+  // cartão ou o valor padrão do item). Usado para debitar/creditar a conta ao marcar Pago/Recebido.
+  function effectiveCellValue(item, ymStr, cell) {
+    if (cell && cell.value != null) return cell.value;
+    if (item && item.autoCartao) { const v = autoCartaoValue(ymStr); if (v != null) return v; }
+    if (item && inRangeRaw(item, ymStr)) return item.defaultValue;
+    return null;
+  }
+
   function setCell(itemId, ymStr, data) {
     const k = itemId + "|" + ymStr;
-    if (!data || (data.value == null && !data.status && !data.note)) delete state.flowCells[k];
-    else state.flowCells[k] = data;
+    if (!data || (data.value == null && !data.status && !data.note)) { delete state.flowCells[k]; save(); return; }
+    // Ao marcar Pago/Recebido, registra o instante da quitação e o valor movimentado,
+    // para que o Saldo em conta seja debitado/creditado automaticamente.
+    if (data.status && data.status !== "PENDENTE") {
+      const prev = state.flowCells[k];
+      const jaQuitado = prev && prev.status && prev.status !== "PENDENTE" && prev.settledAt;
+      data.settledAt = jaQuitado ? prev.settledAt : new Date().toISOString();
+      const item = state.flowItems.find(i => i.id === itemId);
+      data.settledValue = effectiveCellValue(item, ymStr, data);
+    }
+    state.flowCells[k] = data;
     save();
   }
 
@@ -197,19 +231,66 @@ const Store = (() => {
   // Se o usuário informou o saldo em conta (settings.conta = {ym, valor}), a projeção
   // parte desse valor real: saldo(mês âncora) = valor informado + pendências do próprio mês.
   // Sem âncora, acumula do zero desde o anoInicial (comportamento da planilha).
+  function contaAncoraYm() {
+    const c = state.settings.conta;
+    if (!c) return null;
+    return c.at ? c.at.slice(0, 7) : (c.ym || null);
+  }
+
   function saldoSerie(ano) {
     const anchor = state.settings.conta;
+    const anchorYm = contaAncoraYm();
     const serie = [];
     let s = 0;
     let cur = U.ym(state.settings.anoInicial, 1);
     const fim = U.ym(ano, 12);
     while (U.ymCmp(cur, fim) <= 0) {
-      if (anchor && anchor.ym === cur) s = anchor.valor;
+      if (anchor && anchorYm === cur) s = anchor.valor;
       s += monthTotal(cur);
       if (U.ymParse(cur).y === ano) serie.push({ ym: cur, saldo: s });
       cur = U.ymAdd(cur, 1);
     }
     return serie;
+  }
+
+  // Projeção do saldo a partir de hoje: começa no saldo atual real da conta e soma, mês a mês,
+  // só o que ainda está pendente (itens já Pagos/Recebidos contam 0). Usada no dashboard —
+  // fica coerente com o "Saldo em conta" e não mostra meses passados acumulando do zero.
+  function saldoProjecaoSerie() {
+    const start = U.ymHoje();
+    const fim = U.ym(U.ymParse(start).y, 12);
+    const base = saldoContaAtual();
+    const serie = [];
+    let s = base != null ? base : 0;
+    let cur = start;
+    while (U.ymCmp(cur, fim) <= 0) {
+      s += monthTotal(cur); // projectedValue: Pago/Recebido = 0
+      serie.push({ ym: cur, saldo: Math.round(s * 100) / 100 });
+      cur = U.ymAdd(cur, 1);
+    }
+    return serie;
+  }
+
+  // Saldo atual da conta: parte do valor informado e aplica tudo que já foi realizado depois —
+  // itens do fluxo marcados Pago/Recebido e lançamentos via pix/débito/transferência.
+  // É recalculado a cada tela (determinístico), então funciona bem com a sincronização.
+  function saldoContaAtual() {
+    const c = state.settings.conta;
+    if (!c) return null;
+    const anchorAt = c.at || (c.ym ? c.ym + "-01T00:00:00.000Z" : null);
+    let s = c.valor;
+    for (const key in state.flowCells) {
+      const cell = state.flowCells[key];
+      if (!cell || !cell.status || cell.status === "PENDENTE") continue;
+      if (cell.settledValue != null && cell.settledAt && (!anchorAt || cell.settledAt > anchorAt)) {
+        s += cell.settledValue;
+      }
+    }
+    for (const t of state.transactions) {
+      const at = t.createdAt || (t.date ? t.date + "T12:00:00.000Z" : null);
+      if (at && (!anchorAt || at > anchorAt)) s += t.value;
+    }
+    return Math.round(s * 100) / 100;
   }
 
   function saldoAcumuladoAte(ymStr) {
@@ -220,7 +301,11 @@ const Store = (() => {
   }
 
   // ---------- Lançamentos ----------
-  function addTransaction(tx) { state.transactions.push(tx); save(); }
+  function addTransaction(tx) {
+    if (!tx.createdAt) tx.createdAt = new Date().toISOString();
+    state.transactions.push(tx);
+    save();
+  }
   function removeTransaction(id) {
     state.transactions = state.transactions.filter(t => t.id !== id);
     save();
@@ -269,6 +354,22 @@ const Store = (() => {
     return inv().fixed.reduce((s, f) => s + (f.value || 0), 0);
   }
 
+  // Rentabilidade da carteira de ações/FIIs: compara o valor atual (cotação) com o preço pago.
+  // Considera só ativos que têm preço médio informado e cotação. Retorna null se não houver base.
+  function carteiraRentabilidade() {
+    let custo = 0, atual = 0, temBase = false;
+    for (const a of inv().assets) {
+      const q = inv().quotes[a.ticker];
+      if (a.avgPrice == null || a.avgPrice <= 0 || !q) continue;
+      temBase = true;
+      custo += a.avgPrice * a.qty;
+      atual += q.price * a.qty;
+    }
+    if (!temBase || custo <= 0) return null;
+    const ganho = atual - custo;
+    return { custo, atual, ganho, pct: (ganho / custo) * 100 };
+  }
+
   // Guarda cotações novas e registra o snapshot do dia no histórico
   function saveQuotes(mapa) {
     Object.assign(inv().quotes, mapa);
@@ -307,11 +408,11 @@ const Store = (() => {
   return {
     get state() { return state; },
     load, save, seed,
-    inRangeRaw, getCell, setCell, plannedValue, projectedValue,
-    monthTotal, saldoAcumuladoAte, saldoSerie,
+    inRangeRaw, getCell, setCell, plannedValue, projectedValue, effectiveCellValue,
+    monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
-    inv, rvTotal, rfTotal, saveQuotes, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     exportJSON, importJSON, resetAll
   };
