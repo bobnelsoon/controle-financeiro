@@ -56,16 +56,28 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (com `createdAt`). É recalculado a cada render (seguro para a sincronização). Reinformar o saldo
   recalibra a âncora (`at = agora`). Compras no cartão NÃO mexem no saldo até a fatura ser paga.
 
-- **Dashboard — receitas/despesas/resultado do mês**: receitas = itens de receita do fluxo no mês +
-  lançamentos avulsos positivos. Despesas = despesas fixas + avulsos negativos + **gasto do cartão
-  (fatura vigente)**. O item automático `autoCartao` ("Cartão (fatura)") é **ignorado** nesse cálculo
-  para não contar a fatura em dobro; o gráfico "Despesas por categoria" usa a mesma base.
-  Resultado = receitas − despesas.
+- **Resultado do mês — FONTE ÚNICA `Store.resultadoMes(ym)`** (usada pelo Dashboard **e** pelo Fluxo
+  Anual, para as duas telas sempre baterem): receitas − despesas em **valores cheios** (ignora status
+  Pago/Recebido, usa `plannedValue`). Inclui itens fixos do fluxo + lançamentos avulsos do mês +
+  **gasto do cartão do mês** (fatura vigente = `faturaTotal(ymAdd(ym,1))`, porque a compra do mês vira
+  fatura no mês seguinte). O item automático `autoCartao` ("Cartão (fatura)") é **ignorado** para não
+  contar a fatura em dobro. O gráfico "Despesas por categoria" usa a mesma base. **Não alinhar o
+  Resultado ao Acumulado por soma** — são métricas diferentes (ver abaixo).
 
-- **Projeção do saldo** (`Store.saldoProjecaoSerie`, usada só no dashboard): começa no
-  `saldoContaAtual` e projeta do mês atual até dezembro somando `monthTotal` (itens Pago/Recebido
-  contam 0). O `Store.saldoSerie` antigo (estilo planilha, acumula desde janeiro) permanece para a
-  linha "Saldo acumulado" da aba Fluxo Anual.
+- **Acumulado do mês (Dashboard) = saldo previsto na conta no FIM do mês**, não `saldo + resultado`.
+  É `saldoProjecaoSerie()[0].saldo`: parte do `saldoContaAtual` e soma **só o que ainda falta** (itens
+  já Pagos/Recebidos contam 0, pois já estão embutidos no saldo). **Decisão importante:** a fórmula
+  antiga `saldo em conta + resultado do mês` contava em dobro os itens já quitados (o dinheiro deles já
+  está no saldo). Com o mês todo quitado, o Acumulado passa a ser **igual ao próprio saldo em conta**
+  (ex.: usuário com Julho todo pago → Acumulado = saldo = R$ 7.900). "Resultado do mês" e "Acumulado"
+  medem coisas diferentes e **não** se somam ("como foi o mês" vs "quanto vou ter na conta").
+
+- **Projeção do saldo** (`Store.saldoProjecaoSerie`): começa no `saldoContaAtual` e projeta do mês atual
+  até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0). Alimenta o
+  gráfico do dashboard, o "Saldo projetado (Dez)", o "Acumulado do mês" (`[0]`) e, via
+  `Store.saldoAcumuladoSerie(ano)`, a linha **"Saldo acumulado" do Fluxo Anual** (mesma projeção; meses
+  já realizados ficam em branco; sem saldo informado cai no `saldoSerie` antigo estilo planilha).
+  O `Store.saldoSerie` (acumula desde janeiro) só é usado nesse fallback e em `saldoAcumuladoAte`.
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
@@ -87,3 +99,31 @@ conferindo que não há erro de JS e que os números batem.
 ## Branch de trabalho
 
 Desenvolvimento nesta iteração: `claude/project-updates-2r7rf9`.
+Fluxo de publicação: commitar na branch → abrir PR para `main` → **merge** (o app é publicado
+automaticamente pelo GitHub Pages a partir da `main`, sem workflow de build). URL pública:
+`https://bobnelsoon.github.io/controle-financeiro/` (o agente não consegue abrir esse link — a rede
+do ambiente bloqueia `github.io`; a publicação em si é automática do lado do GitHub).
+
+## Onde paramos (para continuar amanhã)
+
+Versão publicada atual: `v8` / cache `202607190100`. PRs #1 a #5 já mesclados na `main`.
+
+Já feito e no ar:
+- Dashboard: quadros clicáveis (`data-goto`), cartões em lista com total, próximos vencimentos por mês.
+- Saldo em conta automático (Pago/Recebido + lançamentos pix/débito).
+- Fatura do cartão sempre um mês à frente.
+- Investimentos com preço pago, ganho/perda e rentabilidade da carteira.
+- Quadros **Resultado do mês** e **Acumulado do mês** no dashboard; Fluxo e Dashboard usam a **fonte
+  única** `Store.resultadoMes` / `Store.saldoAcumuladoSerie`, então os números batem entre as telas.
+- Acumulado corrigido para não contar itens quitados em dobro (= saldo previsto no fim do mês).
+
+Pontos de atenção conhecidos:
+- **Próximos vencimentos** juntam `flowItems` (com `dueDay`) **e** parcelas de `loans` — não há vínculo
+  entre eles. Se o usuário cadastrar a mesma coisa nos dois lugares, aparece duplicado (foi o caso do
+  "Carro Taiara" × "Taiara — parcela 28", resolvido pelo usuário apagando o item de fluxo). É dado do
+  usuário; o agente não acessa/edita (vive no localStorage/Gist).
+- Nenhuma tarefa de implementação pendente confirmada. Aguardar o usuário validar os valores no app.
+
+Testes headless ficam em `scratchpad/` (build.mjs gera `preview-demo.html` com dados fake +
+`window.Store`; test*.mjs dirigem via Playwright servindo por `python3 -m http.server`). Nunca subir
+dados reais do usuário ao repo nem a artifacts públicos.
