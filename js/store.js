@@ -354,6 +354,22 @@ const Store = (() => {
     return inv().fixed.reduce((s, f) => s + (f.value || 0), 0);
   }
 
+  // Rentabilidade da carteira de ações/FIIs: compara o valor atual (cotação) com o preço pago.
+  // Considera só ativos que têm preço médio informado e cotação. Retorna null se não houver base.
+  function carteiraRentabilidade() {
+    let custo = 0, atual = 0, temBase = false;
+    for (const a of inv().assets) {
+      const q = inv().quotes[a.ticker];
+      if (a.avgPrice == null || a.avgPrice <= 0 || !q) continue;
+      temBase = true;
+      custo += a.avgPrice * a.qty;
+      atual += q.price * a.qty;
+    }
+    if (!temBase || custo <= 0) return null;
+    const ganho = atual - custo;
+    return { custo, atual, ganho, pct: (ganho / custo) * 100 };
+  }
+
   // Guarda cotações novas e registra o snapshot do dia no histórico
   function saveQuotes(mapa) {
     Object.assign(inv().quotes, mapa);
@@ -396,7 +412,7 @@ const Store = (() => {
     monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
-    inv, rvTotal, rfTotal, saveQuotes, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     exportJSON, importJSON, resetAll
   };

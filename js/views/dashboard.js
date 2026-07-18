@@ -7,9 +7,17 @@ const ViewDashboard = (() => {
     const { y: ano, m: mes } = U.ymParse(ymAtual);
     const st = Store.state;
 
-    // Receitas/despesas planejadas do mês (fluxo) + lançamentos avulsos
+    // Fatura vigente = o que você gastou agora, pago no mês seguinte
+    const ymFatura = U.ymAdd(ymAtual, 1);
+    const mesFatura = U.ymParse(ymFatura).m;
+    const gastoCartao = Store.faturaTotal(ymFatura, null); // positivo = total gasto no cartão
+
+    // Receitas/despesas do mês: itens do fluxo + lançamentos avulsos.
+    // O item "Cartão (fatura)" é ignorado aqui porque o gasto do cartão entra pela
+    // fatura vigente (gastoCartao), evitando contar a fatura do mês já paga em dobro.
     let receitas = 0, despesas = 0;
     for (const it of st.flowItems) {
+      if (it.autoCartao) continue;
       const v = Store.plannedValue(it, ymAtual);
       if (v == null) continue;
       if (v > 0) receitas += v; else despesas += v;
@@ -17,6 +25,7 @@ const ViewDashboard = (() => {
     for (const t of Store.txDoMes(ymAtual)) {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
     }
+    despesas -= gastoCartao; // inclui o gasto real do cartão como despesa do mês
     const saldoMes = receitas + despesas;
     const serie = Store.saldoProjecaoSerie();
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
@@ -61,16 +70,16 @@ const ViewDashboard = (() => {
 
     // Cartões de crédito — fatura vigente (gasto do mês atual é pago no mês seguinte,
     // então a fatura em aberto é a do próximo mês). Todos os cartões aparecem.
-    const ymFatura = U.ymAdd(ymAtual, 1);
-    const mesFatura = U.ymParse(ymFatura).m;
     const cartoes = st.accounts
       .filter(a => a.type === "cartao")
       .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymFatura, a.id) }))
       .sort((a, b) => b.total - a.total);
     const totalFat = cartoes.reduce((s, c) => s + c.total, 0);
 
-    // Gastos por categoria
+    // Gastos por categoria (o cartão usa a fatura vigente, igual à despesa do mês)
     const porCat = Store.despesasPorCategoria(ymAtual);
+    const itemCartao = st.flowItems.find(i => i.autoCartao);
+    if (itemCartao && gastoCartao) porCat[itemCartao.categoryId] = gastoCartao;
     const rows = Object.entries(porCat)
       .map(([cat, v]) => ({ label: Store.catName(cat), value: v }))
       .sort((a, b) => b.value - a.value)
@@ -97,7 +106,7 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Despesas do mês</div>
           <div class="stat-value neg num">${U.brl(despesas)}</div>
-          <div class="stat-sub">total previsto + lançamentos do mês</div>
+          <div class="stat-sub">fixas + lançamentos + fatura do cartão</div>
         </div>
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Resultado do mês</div>
@@ -111,7 +120,13 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="investimentos">
           <div class="stat-label">📈 Patrimônio investido</div>
           <div class="stat-value num">${patrimonio > 0 ? U.brl(patrimonio) : "—"}</div>
-          <div class="stat-sub">ações, FIIs e renda fixa</div>
+          <div class="stat-sub">${(() => {
+            const r = Store.carteiraRentabilidade();
+            if (!r) return "ações, FIIs e renda fixa";
+            const cls = r.ganho > 0 ? "pos" : r.ganho < 0 ? "neg" : "muted";
+            const sinal = r.ganho >= 0 ? "+" : "";
+            return `<span class="${cls} num">${sinal}${U.brl(r.ganho)} · ${sinal}${r.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span> <span class="muted">rentab. ações/FIIs</span>`;
+          })()}</div>
         </div>
       </div>
 
