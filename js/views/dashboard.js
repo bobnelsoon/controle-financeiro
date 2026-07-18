@@ -26,18 +26,17 @@ const ViewDashboard = (() => {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
     }
     despesas -= gastoCartao; // inclui o gasto real do cartão como despesa do mês
-    // Resultado do mês = o que ainda FALTA acontecer no mês (itens já Pagos/Recebidos contam 0,
-    // pois já estão no saldo em conta). Com o mês todo quitado, dá 0 e o Acumulado = saldo.
-    // É a mesma base (monthTotal/projectedValue) da projeção e do Fluxo Anual.
-    const saldoMes = Store.monthTotal(ymAtual);
+    // Resultado e Acumulado olham para o PRÓXIMO mês (ymFatura), porque o mês atual costuma já
+    // estar quitado (resultado 0) e a fatura do cartão do mês atual só é paga no mês seguinte.
+    // Resultado do próximo mês = o que está previsto acontecer nele (monthTotal/projectedValue).
+    const saldoMes = Store.monthTotal(ymFatura);
     const serie = Store.saldoProjecaoSerie();
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Acumulado do mês = saldo previsto na conta no fim do mês. Parte do saldo atual e soma
-    // só o que ainda falta (itens já Pagos/Recebidos contam 0, pois já estão no saldo). Assim,
-    // com tudo quitado no mês, o Acumulado é igual ao próprio saldo em conta — sem contar em dobro.
-    const acumulado = saldoConta != null && serie.length ? serie[0].saldo : null;
+    // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
+    const pProx = serie.find(p => p.ym === ymFatura);
+    const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
     // Próximos vencimentos: do mês atual até dezembro, agrupados por mês.
@@ -116,15 +115,15 @@ const ViewDashboard = (() => {
           <div class="stat-sub">fixas + lançamentos + fatura do cartão</div>
         </div>
         <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Resultado do mês</div>
+          <div class="stat-label">Resultado de ${U.MESES[mesFatura - 1]}</div>
           <div class="stat-value num ${U.clsValor(saldoMes)}">${U.brl(saldoMes)}</div>
-          <div class="stat-sub">o que ainda falta no mês (já pago/recebido = 0)</div>
+          <div class="stat-sub">receitas − despesas previstas de ${U.MESES[mesFatura - 1]}</div>
         </div>
         ${acumulado != null ? `
         <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Acumulado do mês</div>
+          <div class="stat-label">Acumulado de ${U.MESES[mesFatura - 1]}</div>
           <div class="stat-value num ${U.clsValor(acumulado)}">${U.brl(acumulado)}</div>
-          <div class="stat-sub">saldo em conta + resultado do mês</div>
+          <div class="stat-sub">saldo previsto na conta no fim de ${U.MESES[mesFatura - 1]}</div>
         </div>` : ""}
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Saldo projetado (Dez/${ano})</div>
