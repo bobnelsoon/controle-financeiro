@@ -18,7 +18,7 @@ const ViewDashboard = (() => {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
     }
     const saldoMes = receitas + despesas;
-    const serie = Store.saldoSerie(ano);
+    const serie = Store.saldoProjecaoSerie();
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
@@ -59,10 +59,13 @@ const ViewDashboard = (() => {
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — total da fatura do mês por cartão (todos aparecem)
+    // Cartões de crédito — fatura vigente (gasto do mês atual é pago no mês seguinte,
+    // então a fatura em aberto é a do próximo mês). Todos os cartões aparecem.
+    const ymFatura = U.ymAdd(ymAtual, 1);
+    const mesFatura = U.ymParse(ymFatura).m;
     const cartoes = st.accounts
       .filter(a => a.type === "cartao")
-      .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymAtual, a.id) }))
+      .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymFatura, a.id) }))
       .sort((a, b) => b.total - a.total);
 
     // Gastos por categoria
@@ -112,7 +115,7 @@ const ViewDashboard = (() => {
       </div>
 
       ${cartoes.length ? `
-      <h2 class="section mt">💳 Cartões de crédito — ${U.MESES[mes - 1]}</h2>
+      <h2 class="section mt">💳 Cartões de crédito — fatura de ${U.MESES[mesFatura - 1]} <span class="muted" style="font-weight:400;text-transform:none">(gastos de ${U.MESES[mes - 1]})</span></h2>
       <div class="cards-grid" id="dash-cartoes">
         ${cartoes.map(c => `
           <div class="card stat clickable" data-goto="cartoes">
@@ -123,7 +126,7 @@ const ViewDashboard = (() => {
 
       <div class="grid-2 mt">
         <div class="card">
-          <h2 class="section">Evolução do saldo — ${ano}</h2>
+          <h2 class="section">Projeção do saldo — ${U.MESES[mes - 1]} a Dez/${ano}</h2>
           <div id="chart-saldo"></div>
         </div>
         <div class="card">

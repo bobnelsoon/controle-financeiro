@@ -2,7 +2,9 @@
 "use strict";
 
 const ViewCartoes = (() => {
-  let mesSel = U.ymHoje();
+  // Abre na fatura vigente: gastos do mês atual são pagos no mês seguinte,
+  // então a fatura "em aberto" é a do próximo mês.
+  let mesSel = U.ymAdd(U.ymHoje(), 1);
 
   function abrirConta(acc) {
     const isNew = !acc;
@@ -70,8 +72,9 @@ const ViewCartoes = (() => {
         <button id="btn-nova">+ Cartão</button>
       </div>
       <p class="muted" style="font-size:12.5px;margin-top:-8px">
-        Gastos importados da planilha (passados e parcelas futuras já programadas) + compras novas.
-        O total do mês abastece automaticamente o item <b>Cartão (fatura)</b> do Fluxo Anual.</p>
+        A fatura é identificada pelo <b>mês em que é paga</b>: um gasto feito agora entra na fatura do mês seguinte.
+        Por isso a tela abre na <b>fatura vigente</b> (${U.MESES[U.ymParse(mesSel).m - 1]}), que reúne os gastos do mês anterior.
+        O total abastece o item <b>Cartão (fatura)</b> do Fluxo Anual.</p>
       <div id="card-list"></div>`;
 
     root.querySelector("#sel-mes").addEventListener("change", e => { mesSel = e.target.value; App.render(); });

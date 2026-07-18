@@ -252,6 +252,24 @@ const Store = (() => {
     return serie;
   }
 
+  // Projeção do saldo a partir de hoje: começa no saldo atual real da conta e soma, mês a mês,
+  // só o que ainda está pendente (itens já Pagos/Recebidos contam 0). Usada no dashboard —
+  // fica coerente com o "Saldo em conta" e não mostra meses passados acumulando do zero.
+  function saldoProjecaoSerie() {
+    const start = U.ymHoje();
+    const fim = U.ym(U.ymParse(start).y, 12);
+    const base = saldoContaAtual();
+    const serie = [];
+    let s = base != null ? base : 0;
+    let cur = start;
+    while (U.ymCmp(cur, fim) <= 0) {
+      s += monthTotal(cur); // projectedValue: Pago/Recebido = 0
+      serie.push({ ym: cur, saldo: Math.round(s * 100) / 100 });
+      cur = U.ymAdd(cur, 1);
+    }
+    return serie;
+  }
+
   // Saldo atual da conta: parte do valor informado e aplica tudo que já foi realizado depois —
   // itens do fluxo marcados Pago/Recebido e lançamentos via pix/débito/transferência.
   // É recalculado a cada tela (determinístico), então funciona bem com a sincronização.
@@ -374,7 +392,7 @@ const Store = (() => {
     get state() { return state; },
     load, save, seed,
     inRangeRaw, getCell, setCell, plannedValue, projectedValue, effectiveCellValue,
-    monthTotal, saldoAcumuladoAte, saldoSerie, saldoContaAtual, contaAncoraYm,
+    monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
     inv, rvTotal, rfTotal, saveQuotes, aportesDoAno,

@@ -29,9 +29,9 @@ const ViewLancamentos = (() => {
       atualizam o <b>Saldo em conta</b> na hora: <b>Entrada</b> soma, <b>Saída</b> subtrai.</p>
       <div id="lanc-cartao-box" style="display:none">
         <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartoes}</select></label>
-        <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${U.ymHoje()}"></label>
-        <p class="muted" style="font-size:12px">A compra vai direto para a tela <b>Cartões</b> e o item
-        "Cartão (fatura)" do Fluxo Anual atualiza sozinho (parcelas caem nas próximas faturas).</p>
+        <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${U.ymAdd(U.ymHoje(), 1)}"></label>
+        <p class="muted" style="font-size:12px">Já vem preenchido com a <b>fatura do mês seguinte</b> (gasto de hoje é pago no próximo mês).
+        A compra vai para a tela <b>Cartões</b> e o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho (parcelas caem nas próximas faturas).</p>
       </div>
       <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
     `, (form) => {
