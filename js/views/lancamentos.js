@@ -18,6 +18,8 @@ const ViewLancamentos = (() => {
           <option value="pix">Pix / transferência / débito</option>
           <option value="cartao">💳 Cartão de crédito</option>
         </select></label>
+      <p class="muted" id="lanc-pix-nota" style="font-size:12px">Lançamentos por pix/débito/transferência
+      atualizam o <b>Saldo em conta</b> na hora: valor positivo entra, negativo sai.</p>
       <div id="lanc-cartao-box" style="display:none">
         <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartoes}</select></label>
         <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${U.ymHoje()}"></label>
@@ -68,7 +70,9 @@ const ViewLancamentos = (() => {
     // mostra a escolha do cartão só quando a forma de pagamento é "cartão"
     const selForma = document.getElementById("lanc-forma");
     selForma.addEventListener("change", () => {
-      document.getElementById("lanc-cartao-box").style.display = selForma.value === "cartao" ? "" : "none";
+      const ehCartao = selForma.value === "cartao";
+      document.getElementById("lanc-cartao-box").style.display = ehCartao ? "" : "none";
+      document.getElementById("lanc-pix-nota").style.display = ehCartao ? "none" : "";
     });
   }
 

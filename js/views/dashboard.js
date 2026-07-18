@@ -21,35 +21,49 @@ const ViewDashboard = (() => {
     const serie = Store.saldoSerie(ano);
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
+    const saldoConta = Store.saldoContaAtual();
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
-    // Próximos vencimentos: itens do fluxo com dia definido (não pagos) + parcelas de empréstimos
+    // Próximos vencimentos: do mês atual até dezembro, agrupados por mês.
+    // Inclui itens do fluxo com dia definido (ainda pendentes) e parcelas de empréstimos em aberto.
     const hoje = new Date().getDate();
-    const venc = [];
-    for (const it of st.flowItems) {
-      if (it.dueDay == null || it.dueDay === "") continue;
-      const v = Store.plannedValue(it, ymAtual);
-      if (v == null || v === 0) continue;
-      const c = Store.getCell(it.id, ymAtual);
-      if (c && c.status && c.status !== "PENDENTE") continue; // já pago/recebido
-      venc.push({
-        dia: U.diaVencimento(it.dueDay, ano, mes),
-        nome: it.name,
-        valor: Math.abs(v),
-        tipo: v > 0 ? "Receber" : "Pagar",
-        cls: v > 0 ? "pos" : "neg"
-      });
-    }
-    for (const l of st.loans) {
-      for (const p of l.items) {
-        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymAtual) {
-          venc.push({ dia: Number(p.due.slice(8)), nome: `${l.person} — ${p.label || "parcela"}`, valor: p.value, tipo: "Receber", cls: "pos" });
+    const gruposVenc = [];
+    for (let mm = mes; mm <= 12; mm++) {
+      const ymStr = U.ym(ano, mm);
+      const lista = [];
+      for (const it of st.flowItems) {
+        if (it.dueDay == null || it.dueDay === "") continue;
+        const v = Store.plannedValue(it, ymStr);
+        if (v == null || v === 0) continue;
+        const c = Store.getCell(it.id, ymStr);
+        if (c && c.status && c.status !== "PENDENTE") continue; // já pago/recebido
+        lista.push({
+          dia: U.diaVencimento(it.dueDay, ano, mm),
+          nome: it.name,
+          valor: Math.abs(v),
+          tipo: v > 0 ? "Receber" : "Pagar",
+          cls: v > 0 ? "pos" : "neg"
+        });
+      }
+      for (const l of st.loans) {
+        for (const p of l.items) {
+          if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymStr) {
+            lista.push({ dia: Number(p.due.slice(8)), nome: `${l.person} — ${p.label || "parcela"}`, valor: p.value, tipo: "Receber", cls: "pos" });
+          }
         }
       }
+      if (!lista.length) continue;
+      lista.sort((a, b) => a.dia - b.dia);
+      if (mm === mes) for (const v of lista) v.atrasado = v.dia < hoje;
+      gruposVenc.push({ ymStr, mm, itens: lista });
     }
-    venc.sort((a, b) => a.dia - b.dia);
-    for (const v of venc) v.atrasado = v.dia < hoje;
-    const proximos = venc.slice(0, 9);
+
+    // Cartões de crédito — total da fatura do mês por cartão
+    const cartoes = st.accounts
+      .filter(a => a.type === "cartao")
+      .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymAtual, a.id) }))
+      .filter(c => c.total !== 0 || st.accounts.length <= 8)
+      .sort((a, b) => b.total - a.total);
 
     // Gastos por categoria
     const porCat = Store.despesasPorCategoria(ymAtual);
@@ -67,36 +81,47 @@ const ViewDashboard = (() => {
         <button class="btn-primary" id="btn-atualizar">🔄 Atualizar</button>
       </div>
       <div class="cards-grid">
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">💰 Saldo em conta <button class="btn-sm" id="btn-edit-conta" title="Atualizar saldo">✎</button></div>
-          <div class="stat-value num ${conta ? U.clsValor(conta.valor) : "muted"}">${conta ? U.brl(conta.valor) : "informar"}</div>
-          <div class="stat-sub">${conta ? "informado em " + U.ymLabel(conta.ym) + " — base da projeção" : "clique no lápis para informar"}</div>
+          <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
+          <div class="stat-sub">${conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar"}</div>
         </div>
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Receitas do mês</div>
           <div class="stat-value pos num">${U.brl(receitas)}</div>
         </div>
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Despesas do mês</div>
           <div class="stat-value neg num">${U.brl(despesas)}</div>
+          <div class="stat-sub">total previsto + lançamentos do mês</div>
         </div>
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Resultado do mês</div>
           <div class="stat-value num ${U.clsValor(saldoMes)}">${U.brl(saldoMes)}</div>
         </div>
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Saldo projetado (Dez/${ano})</div>
           <div class="stat-value num ${U.clsValor(saldoDez)}">${U.brl(saldoDez)}</div>
           <div class="stat-sub">${conta ? "a partir do saldo em conta" : "projeção do fluxo anual"}</div>
         </div>
-        <div class="card stat">
+        <div class="card stat clickable" data-goto="investimentos">
           <div class="stat-label">📈 Patrimônio investido</div>
           <div class="stat-value num">${patrimonio > 0 ? U.brl(patrimonio) : "—"}</div>
-          <div class="stat-sub"><a href="#investimentos">ações, FIIs e renda fixa</a></div>
+          <div class="stat-sub">ações, FIIs e renda fixa</div>
         </div>
       </div>
 
-      <div class="grid-2">
+      ${cartoes.length ? `
+      <h2 class="section mt">💳 Cartões de crédito — ${U.MESES[mes - 1]}</h2>
+      <div class="cards-grid" id="dash-cartoes">
+        ${cartoes.map(c => `
+          <div class="card stat clickable" data-goto="cartoes">
+            <div class="stat-label">${U.esc(c.name)}${c.dueDay ? ` <span class="muted" style="font-weight:400">· vence dia ${c.dueDay}</span>` : ""}</div>
+            <div class="stat-value num ${c.total > 0 ? "neg" : ""}">${U.brl(c.total)}</div>
+          </div>`).join("")}
+      </div>` : ""}
+
+      <div class="grid-2 mt">
         <div class="card">
           <h2 class="section">Evolução do saldo — ${ano}</h2>
           <div id="chart-saldo"></div>
@@ -111,6 +136,11 @@ const ViewDashboard = (() => {
         <h2 class="section">Despesas por categoria — ${U.MESES[mes - 1]}</h2>
         <div id="chart-cat"></div>
       </div>`;
+
+    // Quadros clicáveis: leva para a aba referente
+    root.querySelectorAll(".card.clickable[data-goto]").forEach(card => {
+      card.addEventListener("click", () => { location.hash = "#" + card.dataset.goto; });
+    });
 
     // 🔄 Atualizar tudo: sincroniza com o cofre + busca cotações + recalcula as telas
     root.querySelector("#btn-atualizar").addEventListener("click", async (e) => {
@@ -140,18 +170,20 @@ const ViewDashboard = (() => {
       }
     });
 
-    root.querySelector("#btn-edit-conta").addEventListener("click", () => {
+    root.querySelector("#btn-edit-conta").addEventListener("click", (e) => {
+      e.stopPropagation();
       UI.modal("Saldo em conta corrente", `
         <label class="fld"><span>Quanto você tem em conta hoje (R$)?</span>
           <input type="text" name="valor" inputmode="decimal" required
             value="${conta ? String(conta.valor).replace(".", ",") : ""}" placeholder="ex.: 5.300,00"></label>
-        <p class="muted" style="font-size:12px">A projeção de saldo passa a partir deste valor: os itens ainda pendentes
-        do mês atual e dos próximos meses são somados/abatidos dele. Atualize sempre que quiser recalibrar
-        (os itens já marcados como Pago/Recebido não são contados de novo).</p>
+        <p class="muted" style="font-size:12px">A partir deste valor, o saldo é atualizado sozinho: quando você
+        marca um item como <b>Pago</b> no Fluxo Anual ele é debitado, quando marca <b>Recebido</b> é somado, e
+        cada lançamento via pix/débito/transferência entra automaticamente. Informe de novo sempre que quiser
+        recalibrar com o valor real do banco (os movimentos anteriores a esse momento deixam de ser contados).</p>
       `, (form) => {
         const v = U.parseMoney(form.valor.value);
         if (v == null) return false;
-        st.settings.conta = { ym: U.ymHoje(), valor: v };
+        st.settings.conta = { at: new Date().toISOString(), valor: v };
         Store.save();
         App.render();
       });
@@ -160,16 +192,20 @@ const ViewDashboard = (() => {
     Charts.saldoChart(root.querySelector("#chart-saldo"), serie);
     Charts.barsH(root.querySelector("#chart-cat"), rows);
 
+    // Próximos vencimentos agrupados por mês
     const vencEl = root.querySelector("#dash-venc");
-    if (!proximos.length) vencEl.innerHTML = `<p class="empty">Nada pendente neste mês 🎉</p>`;
-    else for (const v of proximos) {
-      const data = String(v.dia).padStart(2, "0") + "/" + String(mes).padStart(2, "0");
-      vencEl.appendChild(U.el(`
-        <div class="list-row">
-          <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
-          <span class="grow">${U.esc(v.nome)}<span class="muted" style="font-size:11px"> · ${v.tipo}</span></span>
-          <span class="num ${v.cls}">${U.brl(v.valor)}</span>
-        </div>`));
+    if (!gruposVenc.length) vencEl.innerHTML = `<p class="empty">Nada pendente daqui até dezembro 🎉</p>`;
+    else for (const g of gruposVenc) {
+      vencEl.appendChild(U.el(`<div class="venc-mes muted">${U.MESES[g.mm - 1]}</div>`));
+      for (const v of g.itens) {
+        const data = String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
+        vencEl.appendChild(U.el(`
+          <div class="list-row">
+            <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
+            <span class="grow">${U.esc(v.nome)}<span class="muted" style="font-size:11px"> · ${v.tipo}</span></span>
+            <span class="num ${v.cls}">${U.brl(v.valor)}</span>
+          </div>`));
+      }
     }
   }
 
