@@ -160,7 +160,7 @@ const ViewInvestimentos = (() => {
           <h2 class="section" style="margin:0">Ações & FIIs</h2>
           <button class="btn-sm" id="btn-ativo">+ Ativo</button>
         </div>
-        <table class="tbl mt">
+        <table class="tbl tbl-wide mt">
           <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço pago</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
           <tbody id="rv-body"></tbody>
         </table>

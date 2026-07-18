@@ -9,8 +9,15 @@ const ViewLancamentos = (() => {
       .map(a => `<option value="${a.id}">${U.esc(a.name)}</option>`).join("");
     UI.modal("Novo lançamento", `
       <label class="fld"><span>Descrição</span><input type="text" name="desc" required></label>
-      <label class="fld"><span>Valor (R$) — use negativo para despesa, ex.: -89,90</span>
-        <input type="text" name="valor" required placeholder="-89,90" inputmode="decimal"></label>
+      <label class="fld"><span>Valor (R$)</span>
+        <input type="text" name="valor" required placeholder="0,00" inputmode="decimal"></label>
+      <label class="fld" id="lanc-sign-box"><span>Tipo</span>
+        <div class="status-btns" id="lanc-sign">
+          <button type="button" data-sign="-" class="on">－ Saída (despesa)</button>
+          <button type="button" data-sign="+">＋ Entrada (receita)</button>
+        </div>
+        <input type="hidden" name="sign" value="-">
+      </label>
       <label class="fld"><span>Data</span><input type="date" name="data" value="${U.hojeISO()}"></label>
       <label class="fld"><span>Categoria</span>${UI.selectCategorias("cat", "mercado")}</label>
       <label class="fld"><span>Forma de pagamento</span>
@@ -19,7 +26,7 @@ const ViewLancamentos = (() => {
           <option value="cartao">💳 Cartão de crédito</option>
         </select></label>
       <p class="muted" id="lanc-pix-nota" style="font-size:12px">Lançamentos por pix/débito/transferência
-      atualizam o <b>Saldo em conta</b> na hora: valor positivo entra, negativo sai.</p>
+      atualizam o <b>Saldo em conta</b> na hora: <b>Entrada</b> soma, <b>Saída</b> subtrai.</p>
       <div id="lanc-cartao-box" style="display:none">
         <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartoes}</select></label>
         <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${U.ymHoje()}"></label>
@@ -28,8 +35,11 @@ const ViewLancamentos = (() => {
       </div>
       <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
     `, (form) => {
-      const valorTotal = U.parseMoney(form.valor.value);
-      if (valorTotal == null || !form.desc.value.trim()) return false;
+      const bruto = U.parseMoney(form.valor.value);
+      if (bruto == null || !form.desc.value.trim()) return false;
+      // O sinal vem dos botões Entrada (+) / Saída (-); compras no cartão são sempre saída.
+      const sign = form.sign.value === "+" ? 1 : -1;
+      const valorTotal = sign * Math.abs(bruto);
       const n = Math.max(1, Number(form.parcelas.value) || 1);
       const desc = form.desc.value.trim();
 
@@ -67,12 +77,24 @@ const ViewLancamentos = (() => {
       App.render();
     });
 
+    // botões Entrada (+) / Saída (-)
+    document.querySelectorAll("#lanc-sign button").forEach(b => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#lanc-sign button").forEach(x => x.classList.remove("on"));
+        b.classList.add("on");
+        document.querySelector('input[name="sign"]').value = b.dataset.sign;
+      });
+    });
+
     // mostra a escolha do cartão só quando a forma de pagamento é "cartão"
     const selForma = document.getElementById("lanc-forma");
     selForma.addEventListener("change", () => {
       const ehCartao = selForma.value === "cartao";
       document.getElementById("lanc-cartao-box").style.display = ehCartao ? "" : "none";
       document.getElementById("lanc-pix-nota").style.display = ehCartao ? "none" : "";
+      // compra no cartão é sempre saída: esconde o toggle e força o sinal negativo
+      document.getElementById("lanc-sign-box").style.display = ehCartao ? "none" : "";
+      if (ehCartao) document.querySelector('input[name="sign"]').value = "-";
     });
   }
 

@@ -55,14 +55,14 @@ const ViewDashboard = (() => {
       if (!lista.length) continue;
       lista.sort((a, b) => a.dia - b.dia);
       if (mm === mes) for (const v of lista) v.atrasado = v.dia < hoje;
-      gruposVenc.push({ ymStr, mm, itens: lista });
+      const total = lista.reduce((s, v) => s + (v.tipo === "Receber" ? v.valor : -v.valor), 0);
+      gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — total da fatura do mês por cartão
+    // Cartões de crédito — total da fatura do mês por cartão (todos aparecem)
     const cartoes = st.accounts
       .filter(a => a.type === "cartao")
       .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymAtual, a.id) }))
-      .filter(c => c.total !== 0 || st.accounts.length <= 8)
       .sort((a, b) => b.total - a.total);
 
     // Gastos por categoria
@@ -192,20 +192,35 @@ const ViewDashboard = (() => {
     Charts.saldoChart(root.querySelector("#chart-saldo"), serie);
     Charts.barsH(root.querySelector("#chart-cat"), rows);
 
-    // Próximos vencimentos agrupados por mês
+    // Próximos vencimentos agrupados por mês, com total e expansão ao clicar no mês
     const vencEl = root.querySelector("#dash-venc");
     if (!gruposVenc.length) vencEl.innerHTML = `<p class="empty">Nada pendente daqui até dezembro 🎉</p>`;
     else for (const g of gruposVenc) {
-      vencEl.appendChild(U.el(`<div class="venc-mes muted">${U.MESES[g.mm - 1]}</div>`));
+      const aberto = g.mm === mes; // mês atual já vem expandido
+      const grupo = U.el(`<div class="venc-group ${aberto ? "open" : ""}"></div>`);
+      const head = U.el(`
+        <button type="button" class="venc-head" aria-expanded="${aberto}">
+          <span class="chev">▸</span>
+          <span class="grow">${U.MESES[g.mm - 1]} <span class="muted" style="font-weight:400">· ${g.itens.length}</span></span>
+          <span class="num ${U.clsValor(g.total)}">${U.brl(g.total)}</span>
+        </button>`);
+      const itens = U.el(`<div class="venc-itens"></div>`);
       for (const v of g.itens) {
         const data = String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
-        vencEl.appendChild(U.el(`
+        itens.appendChild(U.el(`
           <div class="list-row">
             <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
             <span class="grow">${U.esc(v.nome)}<span class="muted" style="font-size:11px"> · ${v.tipo}</span></span>
             <span class="num ${v.cls}">${U.brl(v.valor)}</span>
           </div>`));
       }
+      head.addEventListener("click", () => {
+        const open = grupo.classList.toggle("open");
+        head.setAttribute("aria-expanded", open);
+      });
+      grupo.appendChild(head);
+      grupo.appendChild(itens);
+      vencEl.appendChild(grupo);
     }
   }
 

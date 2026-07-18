@@ -93,8 +93,17 @@ body {
 .card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; }
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
 .card.clickable .btn-sm { cursor: pointer; }
-.venc-mes { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin: 12px 0 4px; }
-.venc-mes:first-child { margin-top: 0; }
+/* Próximos vencimentos: cabeçalho de mês clicável (expande/recolhe) com total */
+.venc-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; border-bottom: 1px solid var(--grid);
+  padding: 9px 0; font-weight: 600; color: var(--ink); text-align: left;
+}
+.venc-head:hover { border-color: var(--grid); color: var(--accent); }
+.venc-head .chev { color: var(--muted); transition: transform .15s; font-size: 11px; }
+.venc-group.open > .venc-head .chev { transform: rotate(90deg); }
+.venc-itens { display: none; padding-left: 2px; }
+.venc-group.open > .venc-itens { display: block; }
 
 .grid-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -117,6 +126,21 @@ body {
   .nav a { padding: 7px 9px; font-size: 12.5px; white-space: nowrap; }
   .main { padding: 14px 12px 50px; }
   .fluxo-wrap { overflow-x: auto; }
+
+  /* Tabelas largas rolam dentro do próprio card em vez de vazar/cortar na tela */
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.tbl { min-width: 460px; }
+  table.tbl.tbl-wide { min-width: 720px; }
+
+  /* Barras de categoria: rótulo menor para caber */
+  .hbar-row { grid-template-columns: 96px 1fr 82px; }
+
+  /* Cabeçalho da página: o seletor de mês/ano ocupa a linha inteira */
+  .page-head { gap: 8px 10px; }
+  .page-head h1 { width: 100%; }
+
+  /* Modal um pouco mais alto para caber os campos */
+  .modal { width: min(440px, 94vw); padding: 18px 16px; }
 }
 
 h2.section { font-size: 14px; color: var(--ink-2); margin: 0 0 10px; font-weight: 600; }
@@ -227,7 +251,8 @@ table.fluxo { border-collapse: collapse; font-size: 12.5px; min-width: 1080px; }
 }
 .modal h3 { margin: 0 0 14px; font-size: 16px; }
 .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-.status-btns { display: flex; gap: 6px; margin-top: 4px; }
+.status-btns { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.status-btns button { flex: 1 1 auto; }
 .status-btns button.on { outline: 2px solid var(--accent); }
 
 /* ---------- Listas ---------- */
