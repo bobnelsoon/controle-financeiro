@@ -300,24 +300,6 @@ const Store = (() => {
     return p ? p.saldo : 0;
   }
 
-  // Resultado do mês — FONTE ÚNICA usada pelo Dashboard e pelo Fluxo Anual, para os dois
-  // sempre baterem. Receitas − despesas em valores cheios (ignora status Pago/Recebido):
-  // itens fixos do fluxo + lançamentos avulsos do mês + gasto do cartão do mês.
-  // O gasto do cartão do mês é a fatura vigente = a fatura paga no mês SEGUINTE
-  // (ymAdd(ymStr, 1)), porque a compra de um mês vira fatura no mês seguinte.
-  // O item automático "Cartão (fatura)" é ignorado para não contar a fatura em dobro.
-  function resultadoMes(ymStr) {
-    let r = 0;
-    for (const it of state.flowItems) {
-      if (it.autoCartao) continue;
-      const v = plannedValue(it, ymStr);
-      if (v != null) r += v;
-    }
-    for (const t of txDoMes(ymStr)) r += t.value;
-    r -= faturaTotal(U.ymAdd(ymStr, 1), null);
-    return Math.round(r * 100) / 100;
-  }
-
   // Saldo acumulado projetado — parte do saldo real da conta HOJE e projeta mês a mês,
   // somando só o que ainda falta (projectedValue: itens já Pagos/Recebidos contam 0, pois
   // já estão embutidos no saldo em conta). Mesma projeção do dashboard (saldoProjecaoSerie),
@@ -455,7 +437,7 @@ const Store = (() => {
     load, save, seed,
     inRangeRaw, getCell, setCell, plannedValue, projectedValue, effectiveCellValue,
     monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
-    resultadoMes, saldoAcumuladoSerie,
+    saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,

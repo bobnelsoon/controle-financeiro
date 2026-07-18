@@ -40,7 +40,7 @@ const ViewFluxo = (() => {
         </div>
         <input type="hidden" name="status" value="${statusAtual}">
       </label>
-      <p class="muted" style="font-size:12px">Marcar como Pago/Recebido tira o valor da projeção de saldo (como na planilha) e registra que o mês foi quitado.</p>
+      <p class="muted" style="font-size:12px">Marcar como Pago/Recebido tira o valor da projeção de saldo (como na planilha) e registra que o mês foi quitado. Use <b>Limpar</b> para desfazer (volta a Pendente e apaga o valor do mês).</p>
     `, (form) => {
       const valor = U.parseMoney(form.valor.value);
       const status = form.status.value === "PENDENTE" ? null : form.status.value;
@@ -49,7 +49,11 @@ const ViewFluxo = (() => {
       if (status) data.status = status;
       Store.setCell(item.id, ymStr, Object.keys(data).length ? data : null);
       App.render();
-    }, { okLabel: "Salvar" });
+    }, {
+      okLabel: "Salvar",
+      // Só oferece "Limpar" se já houver algo salvo na célula (valor ou Pago/Recebido).
+      extraBtn: (c.value != null || c.status) ? `<button type="button" class="clear-cell">Limpar</button>` : ""
+    });
 
     document.querySelectorAll(".status-btns button").forEach(b => {
       b.addEventListener("click", () => {
@@ -57,6 +61,14 @@ const ViewFluxo = (() => {
         b.classList.add("on");
         document.querySelector('input[name="status"]').value = b.dataset.st;
       });
+    });
+
+    // Limpar: apaga a célula (remove valor e Pago/Recebido, desfazendo o efeito no saldo).
+    const btnLimpar = document.querySelector(".clear-cell");
+    if (btnLimpar) btnLimpar.addEventListener("click", () => {
+      Store.setCell(item.id, ymStr, null);
+      UI.closeModal();
+      App.render();
     });
   }
 
@@ -192,10 +204,11 @@ const ViewFluxo = (() => {
     body.appendChild(U.el(`<tr class="grupo"><td>DESPESAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of despesas) body.appendChild(linhaItem(it, meses, ymAtual));
 
-    // Totais — mesma base do Dashboard (Store.resultadoMes), para os números baterem.
+    // Totais — o que ainda falta no mês (monthTotal/projectedValue: já Pago/Recebido = 0),
+    // mesma base do Dashboard. Mês todo quitado → 0.
     const trTotal = U.el(`<tr class="total"><td>Resultado do mês</td></tr>`);
     for (const mm of meses) {
-      const t = Store.resultadoMes(mm);
+      const t = Store.monthTotal(mm);
       trTotal.appendChild(U.el(`<td class="num ${U.clsValor(t)}" style="text-align:right">${t.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>`));
     }
     body.appendChild(trTotal);
