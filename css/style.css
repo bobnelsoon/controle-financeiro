@@ -105,6 +105,16 @@ body {
 .venc-itens { display: none; padding-left: 2px; }
 .venc-group.open > .venc-itens { display: block; }
 
+/* Cartões no dashboard: lista compacta em colunas (nome — valor) */
+.cartoes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.cartoes-head a:hover { color: var(--accent); }
+.cartoes-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 22px; }
+.cartao-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--grid); }
+.cartao-row .cartao-nome { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-row.clickable { cursor: pointer; }
+.cartao-row.clickable:hover { color: var(--accent); }
+.cartoes-total { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 9px; border-top: 2px solid var(--baseline); font-size: 13px; }
+
 .grid-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 

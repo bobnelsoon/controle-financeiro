@@ -67,6 +67,7 @@ const ViewDashboard = (() => {
       .filter(a => a.type === "cartao")
       .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymFatura, a.id) }))
       .sort((a, b) => b.total - a.total);
+    const totalFat = cartoes.reduce((s, c) => s + c.total, 0);
 
     // Gastos por categoria
     const porCat = Store.despesasPorCategoria(ymAtual);
@@ -115,13 +116,22 @@ const ViewDashboard = (() => {
       </div>
 
       ${cartoes.length ? `
-      <h2 class="section mt">💳 Cartões de crédito — fatura de ${U.MESES[mesFatura - 1]} <span class="muted" style="font-weight:400;text-transform:none">(gastos de ${U.MESES[mes - 1]})</span></h2>
-      <div class="cards-grid" id="dash-cartoes">
-        ${cartoes.map(c => `
-          <div class="card stat clickable" data-goto="cartoes">
-            <div class="stat-label">${U.esc(c.name)}${c.dueDay ? ` <span class="muted" style="font-weight:400">· vence dia ${c.dueDay}</span>` : ""}</div>
-            <div class="stat-value num ${c.total > 0 ? "neg" : ""}">${U.brl(c.total)}</div>
-          </div>`).join("")}
+      <div class="card mt">
+        <div class="cartoes-head">
+          <h2 class="section" style="margin:0">💳 Cartões de crédito — fatura de ${U.MESES[mesFatura - 1]} <span class="muted" style="font-weight:400">(gastos de ${U.MESES[mes - 1]})</span></h2>
+          <a href="#cartoes" class="muted" style="font-size:12px;text-decoration:none">ver detalhes →</a>
+        </div>
+        <div class="cartoes-list" id="dash-cartoes">
+          ${cartoes.map(c => `
+            <div class="cartao-row clickable" data-goto="cartoes">
+              <span class="cartao-nome">${U.esc(c.name)}${c.dueDay ? ` <span class="muted" style="font-weight:400">· dia ${c.dueDay}</span>` : ""}</span>
+              <span class="num ${c.total > 0 ? "neg" : ""}">${U.brl(c.total)}</span>
+            </div>`).join("")}
+        </div>
+        <div class="cartoes-total">
+          <span>Total das faturas</span>
+          <b class="num ${totalFat > 0 ? "neg" : ""}">${U.brl(totalFat)}</b>
+        </div>
       </div>` : ""}
 
       <div class="grid-2 mt">
@@ -140,8 +150,8 @@ const ViewDashboard = (() => {
         <div id="chart-cat"></div>
       </div>`;
 
-    // Quadros clicáveis: leva para a aba referente
-    root.querySelectorAll(".card.clickable[data-goto]").forEach(card => {
+    // Quadros/linhas clicáveis: leva para a aba referente
+    root.querySelectorAll(".clickable[data-goto]").forEach(card => {
       card.addEventListener("click", () => { location.hash = "#" + card.dataset.goto; });
     });
 
