@@ -186,12 +186,12 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Trabalhando na `v19` / cache `202607191600` — **na branch `claude/project-updates-2r7rf9`, AINDA NÃO
-PUBLICADO**. O usuário quer fazer mais melhorias no controle de Combustível **antes** de publicar na `main`
-(a última versão publicada continua sendo a `v18` do Financeiro). Quando ele disser "pode publicar", subir
-tudo pra `main` de uma vez (PR → merge). O app virou **Gestão Pessoal** (guarda-chuva de controles).
+**PUBLICADO**: a `v19` / cache `202607192000` foi para a `main` (PR → merge) e está no ar pelo GitHub Pages.
+O app virou **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial
+lançadora. O usuário vai validar o funcionamento online. Próximas melhorias entram na mesma branch
+`claude/project-updates-2r7rf9` (reiniciada a partir da `main` após o merge) → novo PR → merge.
 
-Feito na branch (validado em headless com os dados reais do usuário; **nada de dado real foi versionado**):
+No ar (v19), validado em headless com os dados reais do usuário (**nada de dado real foi versionado**):
 - **Tela inicial (lançador)** `ViewInicio`: o app **abre sempre nela** com 4 botões — Financeiro, Combustível,
   ➕ Adicionar, 🔄 Atualizar. O botão **➕ Adicionar** também fica na `.brand` (sempre acessível) e abre o menu
   Compra / Compra parcelada / Abastecimento / Recebido / Pago, integrando os dois controles (ver convenções).
