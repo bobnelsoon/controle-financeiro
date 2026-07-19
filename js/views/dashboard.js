@@ -120,6 +120,7 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Receitas do mês</div>
           <div class="stat-value pos num">${U.brl(receitas)}</div>
+          <div class="stat-sub">fixas + lançamentos</div>
         </div>
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Despesas do mês</div>

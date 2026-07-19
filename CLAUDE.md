@@ -124,23 +124,20 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Última versão **publicada na `main`**: `v10` / cache `202607191700` (PRs #1 a #9 mesclados).
+Última versão **publicada na `main`**: `v13` / cache `202607200300` (PRs #1 a #10 mesclados). **Nada
+pendente para publicar** — a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário
+está satisfeito ("está ótimo") e volta quando quiser ajustar algo novo.
 
-**Na branch `claude/project-updates-2r7rf9`, commitado e validado headless, aguardando publicar (PR +
-merge na `main`)** — o usuário adiou o publish nas últimas rodadas:
-- `v11` — Dashboard: removido "Despesas por categoria" e o KPI "Patrimônio investido" do topo; adicionada
-  a seção de investimentos (**Carteira de investimentos** + **Composição da carteira**).
-- `v12` — Safe areas p/ iPhone (Dynamic Island / notch): `viewport-fit=cover`, metas de web app,
-  `theme-color`, `env(safe-area-inset-*)` no menu/conteúdo/modal. Validado a 440×956.
-- `v13` — App sempre abre no Dashboard (`history.replaceState`); excluir compra parcelada com opção
-  **"Excluir todas as N parcelas"** (`groupId` nas novas + fallback por descrição nas antigas).
-
-**➡️ Próximo passo natural: publicar (abrir PR e mesclar na `main`) para v11–v13 irem ao ar.**
-
-Já no ar (v10) e estável:
+No ar (v13) e estável:
+- **Dashboard**: seção de investimentos no rodapé (**Carteira de investimentos** + **Composição da
+  carteira**); saiu o gráfico "Despesas por categoria" e o KPI "Patrimônio investido" do topo.
+- **iPhone / safe areas** (v12): `viewport-fit=cover`, metas de web app, `theme-color`,
+  `env(safe-area-inset-*)` no menu/conteúdo/modal. Validado a 440×956 (iPhone 17 Pro Max).
+- **Abre sempre no Dashboard** (`App.boot` força `#dashboard` via `history.replaceState`).
+- **Excluir compra parcelada** com opção "Excluir todas as N parcelas" (`groupId` nas novas + fallback
+  por descrição nas antigas: `Store.cardTxParcelas` / `removeCardTxIds`).
 - Resultado/Acumulado do Dashboard olham o **próximo mês** (fonte única `Store.monthTotal` /
-  `saldoProjecaoSerie`; Fluxo e Dashboard batem). Botão **Limpar** no editor de célula do Fluxo (desfaz
-  Pago/Recebido). Acumulado não conta itens quitados em dobro.
+  `saldoProjecaoSerie`; Fluxo e Dashboard batem). Botão **Limpar** no editor de célula do Fluxo.
 - Saldo em conta automático; fatura do cartão sempre um mês à frente; investimentos com preço pago,
   ganho/perda e rentabilidade.
 
