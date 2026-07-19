@@ -124,14 +124,18 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Última versão **publicada na `main`**: `v14` / cache `202607200400` (PRs #1 a #11 mesclados). **Nada
+Última versão **publicada na `main`**: `v15` / cache `202607200600` (PRs #1 a #12 mesclados). **Nada
 pendente para publicar** — a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário
 está satisfeito e volta quando quiser ajustar algo novo.
 
-No ar (v14) e estável:
+No ar (v15) e estável:
 - **Cards Receitas/Despesas do mês** (topo, informativos do mês atual): separados **pelo sinal** do
   lançamento — positivo → Receitas, negativo → Despesas (não se misturam; positivo NÃO abate despesa).
   Ambos com subtítulo ("fixas + lançamentos" / "fixas + lançamentos + fatura do cartão").
+- **Card Receitas tem 2 valores** (`.stat-duplo`, fonte menor): "Receitas do mês" e **"Disponível no
+  mês" = Saldo em conta + receitas fixas AINDA A RECEBER** (Σ `projectedValue > 0` dos flowItems). Só
+  as pendentes para NÃO contar em dobro (lançamentos e receitas já recebidas já estão no saldo) — assim
+  o valor fica estável ao receber e só sobe com dinheiro novo. Só aparece se o saldo foi informado.
 - **Dashboard**: seção de investimentos no rodapé (**Carteira de investimentos** + **Composição da
   carteira**); saiu o gráfico "Despesas por categoria" e o KPI "Patrimônio investido" do topo.
 - **iPhone / safe areas** (v12): `viewport-fit=cover`, metas de web app, `theme-color`,
