@@ -313,6 +313,13 @@ const Store = (() => {
       const at = t.createdAt || (t.date ? t.date + "T12:00:00.000Z" : null);
       if (at && (!anchorAt || at > anchorAt)) s += t.value;
     }
+    // Parcelas de empréstimo recebidas (PAGO) depois da âncora entram no saldo, igual às
+    // receitas do fluxo marcadas Recebido — assim marcar PAGO some do "a receber" e cai no saldo.
+    for (const l of state.loans) {
+      for (const p of (l.items || [])) {
+        if (p.status === "PAGO" && p.settledAt && (!anchorAt || p.settledAt > anchorAt)) s += (p.value || 0);
+      }
+    }
     return Math.round(s * 100) / 100;
   }
 

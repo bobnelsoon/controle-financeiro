@@ -78,7 +78,8 @@ const ViewEmprestimos = (() => {
             <td><button class="btn-sm">${p.status === "PAGO" ? '<span class="chip pago">PAGO</span>' : '<span class="chip aberto">ABERTO</span>'}</button></td>
           </tr>`);
         tr.querySelector("button").addEventListener("click", () => {
-          p.status = p.status === "PAGO" ? "ABERTO" : "PAGO";
+          if (p.status === "PAGO") { p.status = "ABERTO"; delete p.settledAt; }
+          else { p.status = "PAGO"; p.settledAt = new Date().toISOString(); } // marca o recebimento p/ entrar no saldo
           Store.save();
           App.render();
         });
