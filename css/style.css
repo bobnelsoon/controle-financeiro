@@ -62,8 +62,62 @@ body {
   padding: 18px 12px;
   position: sticky; top: 0; height: 100vh;
 }
-.brand { font-size: 16px; font-weight: 700; padding: 4px 10px 16px; }
+.brand { padding: 4px 10px 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.brand-nome { font-size: 16px; font-weight: 700; white-space: nowrap; }
 .brand small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+
+/* Seletor de controles (Financeiro / Combustível / ...) */
+.ctrl-switch { position: relative; }
+.ctrl-btn {
+  font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.ctrl-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ctrl-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 172px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0,0,0,.18); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+}
+.ctrl-menu[hidden] { display: none; }
+.ctrl-menu button {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; border: none;
+  background: transparent; border-radius: 7px; font-size: 13px; color: var(--ink-2); cursor: pointer;
+}
+.ctrl-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ctrl-menu button.ativo { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-weight: 600; }
+
+/* Botão "Adicionar" (global, na marca) */
+.add-btn {
+  width: 100%; margin-top: 2px; padding: 7px 10px; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  font-weight: 600; font-size: 12.5px; cursor: pointer;
+}
+.add-btn:hover { filter: brightness(1.08); }
+
+/* Menu Adicionar (lista de opções no modal) */
+.add-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.add-opts button {
+  text-align: left; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer;
+}
+.add-opts button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* Tela inicial (lançador) */
+.inicio { max-width: 640px; margin: 3vh auto 0; }
+.inicio-head { text-align: center; margin-bottom: 22px; }
+.inicio-head h1 { font-size: 26px; margin: 0 0 4px; }
+.inicio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.inicio-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 26px 14px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); cursor: pointer; font-size: 15px; font-weight: 600;
+  color: var(--ink); text-align: center; line-height: 1.25;
+}
+.inicio-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.inicio-btn .ib-ic { font-size: 30px; }
+.inicio-btn small { font-weight: 400; color: var(--muted); font-size: 11px; }
+.inicio-btn.destaque { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+@media (max-width: 560px) { .inicio-grid { grid-template-columns: 1fr; } }
 .nav a {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 10px; border-radius: 8px;
@@ -137,8 +191,10 @@ body {
     /* Respeita a Dynamic Island / notch (topo e laterais em paisagem) */
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
   }
-  .brand { padding: 0 8px 0 2px; font-size: 14px; white-space: nowrap; }
+  .brand { padding: 0 6px 0 2px; flex-direction: row; align-items: center; gap: 7px; }
+  .brand-nome { font-size: 14px; }
   .brand small { display: none; }
+  .ctrl-btn { padding: 3px 9px; font-size: 11.5px; }
   .nav {
     display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -193,6 +249,18 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 label.fld { display: block; margin-bottom: 10px; font-size: 13px; color: var(--ink-2); }
 label.fld > span { display: block; margin-bottom: 3px; font-weight: 600; }
 label.fld input, label.fld select, label.fld textarea { width: 100%; }
+.fld-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+label.fld.fld-check { display: flex; align-items: center; gap: 8px; }
+label.fld.fld-check input { width: auto; }
+label.fld.fld-check > span { margin-bottom: 0; font-weight: 500; }
+label.fld textarea { font-family: inherit; font-size: 12.5px; resize: vertical; }
+tr.linha-pedagio td { color: var(--muted); }
+.revbar { height: 8px; border-radius: 6px; background: var(--grid); overflow: hidden; }
+.revbar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
+.previsao-card { border-left: 3px solid var(--accent); }
+.previsao-card .stat-value { font-size: 24px; font-weight: 700; }
+.previsao-card table.tbl td { padding: 5px 2px; }
+.modal code { font-size: 11.5px; background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 1px 4px; border-radius: 4px; }
 
 /* ---------- Tabelas ---------- */
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }

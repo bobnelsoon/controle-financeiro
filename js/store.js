@@ -10,7 +10,7 @@ const Store = (() => {
   // tudo chega pela sincronização (os dados pessoais não vão no código publicado).
   function seedVazio() {
     return {
-      version: 5,
+      version: 6,
       settings: { anoInicial: 2026, conta: null },
       categories: categoriasPadrao(),
       accounts: [],
@@ -20,8 +20,13 @@ const Store = (() => {
       loans: [],
       budgets: {},
       cardTx: [],
-      investments: { assets: [], fixed: [], quotes: {}, history: [] }
+      investments: { assets: [], fixed: [], quotes: {}, history: [] },
+      fuel: { entries: [], vehicle: defaultVehicle(), maintenance: [] }
     };
+  }
+
+  function defaultVehicle() {
+    return { modelo: "", tanque: null, pneu: "", revisaoKm: null, consumoAlcool: null, consumoGasolina: null };
   }
 
   function categoriasPadrao() {
@@ -124,6 +129,16 @@ const Store = (() => {
         for (const a of st.investments.assets) if (a.avgPrice === undefined) a.avgPrice = null;
       }
       st.version = 5;
+    }
+    if (st.version < 6) {
+      // Novo controle: Combustível (consumo). Só acrescenta o campo, nada existente muda.
+      if (!st.fuel) st.fuel = { entries: [] };
+      st.version = 6;
+    }
+    // Perfil do veículo + manutenção do controle Combustível (idempotente; só acrescenta).
+    if (st.fuel) {
+      if (st.fuel.vehicle === undefined || st.fuel.vehicle === null) st.fuel.vehicle = defaultVehicle();
+      if (!Array.isArray(st.fuel.maintenance)) st.fuel.maintenance = [];
     }
     return st;
   }
@@ -452,6 +467,211 @@ const Store = (() => {
     return t;
   }
 
+  // ---------- Combustível (controle de consumo) ----------
+  // Cada abastecimento: { id, date, odometer, liters, pricePerLiter, total, fuelType, local, toll, obs, full }.
+  // Registros só de pedágio (sem abastecer) têm liters null/0 e guardam apenas o toll.
+  // Ordenados do mais antigo ao mais novo (por data; hodômetro como desempate).
+  function fuelEntries() {
+    return (state.fuel && state.fuel.entries ? state.fuel.entries : []).slice().sort((a, b) => {
+      const d = (a.date || "").localeCompare(b.date || "");
+      if (d !== 0) return d;
+      return (a.odometer || 0) - (b.odometer || 0);
+    });
+  }
+
+  function addFuel(e) {
+    if (!state.fuel) state.fuel = { entries: [] };
+    state.fuel.entries.push({ id: U.id(), ...e });
+    save();
+  }
+  // Insere vários de uma vez (importação): um único save no fim.
+  function addFuelMany(list) {
+    if (!state.fuel) state.fuel = { entries: [] };
+    for (const e of list) state.fuel.entries.push({ id: U.id(), ...e });
+    save();
+  }
+  function updateFuel(id, patch) {
+    const e = (state.fuel.entries || []).find(x => x.id === id);
+    if (e) { Object.assign(e, patch); save(); }
+  }
+  function removeFuel(id) {
+    state.fuel.entries = (state.fuel.entries || []).filter(x => x.id !== id);
+    save();
+  }
+  function clearFuel() {
+    if (!state.fuel) state.fuel = { entries: [] };
+    state.fuel.entries = [];
+    save();
+  }
+
+  // Consumo pelo método correto "tanque cheio → tanque cheio": a distância desde o último
+  // tanque cheio dividida pelos litros abastecidos no intervalo (somando abastecimentos parciais).
+  // Só calcula quando o intervalo não mistura combustíveis diferentes. Abastecimentos parciais
+  // não geram um número próprio (contam para o próximo tanque cheio). `dist` é a distância bruta
+  // desde o registro com hodômetro anterior (para exibição).
+  function fuelEntriesComputed() {
+    const list = fuelEntries();
+    let prevKm = null;              // último hodômetro conhecido (para dist bruta)
+    let lastFullKm = null;         // hodômetro do último tanque cheio
+    let segLiters = 0, segPaid = 0, segFuel = null, segMixed = false;
+    return list.map((e) => {
+      const temAbast = e.liters != null && e.liters > 0 && e.odometer != null;
+      let dist = null, kmL = null, segDist = null, segLitersOut = null, custoKm = null;
+      if (e.odometer != null && prevKm != null && e.odometer > prevKm) dist = e.odometer - prevKm;
+
+      if (temAbast) {
+        if (lastFullKm != null) {
+          segLiters += e.liters;
+          segPaid += (e.total || 0);
+          if (segFuel != null && e.fuelType && e.fuelType !== segFuel) segMixed = true;
+        }
+        const cheio = e.full !== false;
+        if (cheio) {
+          if (lastFullKm != null && e.odometer > lastFullKm && segLiters > 0 && !segMixed) {
+            segDist = e.odometer - lastFullKm;
+            segLitersOut = segLiters;
+            kmL = segDist / segLiters;
+            if (segDist > 0) custoKm = segPaid / segDist;
+          }
+          lastFullKm = e.odometer; segLiters = 0; segPaid = 0; segFuel = e.fuelType || null; segMixed = false;
+        }
+      }
+      if (e.odometer != null) prevKm = e.odometer;
+      return { ...e, dist, kmL, segDist, segLiters: segLitersOut, custoKm };
+    });
+  }
+
+  function fuelStats(ym) {
+    const alvo = ym || U.ymHoje();
+    const comp = fuelEntriesComputed();
+    const validos = comp.filter(e => e.kmL != null);
+    const distValida = validos.reduce((s, e) => s + e.segDist, 0);
+    const litrosValidos = validos.reduce((s, e) => s + e.segLiters, 0);
+    const pagoValido = validos.reduce((s, e) => s + (e.custoKm != null ? e.custoKm * e.segDist : 0), 0);
+    const consumoMedio = litrosValidos > 0 ? distValida / litrosValidos : null;
+    const ultimoConsumo = validos.length ? validos[validos.length - 1].kmL : null;
+    const custoKmMedio = distValida > 0 ? pagoValido / distValida : null;
+
+    const doMes = comp.filter(e => (e.date || "").slice(0, 7) === alvo);
+    const abastMes = doMes.filter(e => e.liters != null && e.liters > 0);
+    const gastoMes = abastMes.reduce((s, e) => s + (e.total || 0), 0);
+    const litrosMes = abastMes.reduce((s, e) => s + (e.liters || 0), 0);
+    const precoMedioMes = litrosMes > 0 ? gastoMes / litrosMes : null;
+    const kmMes = doMes.reduce((s, e) => s + (e.dist || 0), 0);
+    const tollMes = doMes.reduce((s, e) => s + (e.toll || 0), 0);
+
+    const gastoTotal = comp.reduce((s, e) => s + (e.total || 0), 0);
+    const tollTotal = comp.reduce((s, e) => s + (e.toll || 0), 0);
+    const nAbast = comp.filter(e => e.liters != null && e.liters > 0).length;
+    return {
+      consumoMedio, ultimoConsumo, custoKmMedio,
+      gastoMes, litrosMes, precoMedioMes, kmMes, tollMes,
+      gastoTotal, tollTotal, nAbast, nMes: abastMes.length
+    };
+  }
+
+  // Gasto por mês (combustível e pedágio separados), do mais antigo ao mais novo
+  function fuelGastoPorMes() {
+    const comp = fuelEntriesComputed();
+    const map = {};
+    for (const e of comp) {
+      const ym = (e.date || "").slice(0, 7);
+      if (!ym) continue;
+      if (!map[ym]) map[ym] = { ym, comb: 0, toll: 0, litros: 0, km: 0 };
+      map[ym].comb += e.total || 0;
+      map[ym].toll += e.toll || 0;
+      map[ym].litros += e.liters || 0;
+      map[ym].km += e.dist || 0;
+    }
+    return Object.values(map).sort((a, b) => a.ym.localeCompare(b.ym));
+  }
+
+  // Previsão de gasto para o PRÓXIMO mês (para o usuário se programar).
+  // Combustível estimado pelo ritmo real (km/dia) ÷ consumo médio × preço recente do litro;
+  // pedágio pela média mensal dos meses já fechados. Pedágio fica separado (informativo).
+  function fuelPrevisaoProxMes() {
+    const pace = fuelPaceKmDia();
+    const stats = fuelStats();
+    const consumo = stats.consumoMedio;
+    const meses = fuelGastoPorMes();
+    const ymAtual = U.ymHoje();
+    const ymProx = U.ymAdd(ymAtual, 1);
+    const { y, m } = U.ymParse(ymProx);
+    const diasProx = new Date(y, m, 0).getDate();
+
+    // preço médio recente do litro: último mês com litros
+    let precoLitro = null;
+    for (let i = meses.length - 1; i >= 0; i--) { if (meses[i].litros > 0) { precoLitro = meses[i].comb / meses[i].litros; break; } }
+
+    const kmPrev = pace != null ? pace * diasProx : null;
+    const litrosPrev = (kmPrev != null && consumo) ? kmPrev / consumo : null;
+    const combPrev = (litrosPrev != null && precoLitro != null) ? litrosPrev * precoLitro : null;
+
+    // pedágio médio mensal — usa meses fechados (anteriores ao atual). Descarta o 1º mês quando
+    // for claramente parcial (pedágio < metade da mediana dos demais), para não puxar a média pra baixo.
+    let fechados = meses.filter(x => x.ym < ymAtual && x.toll > 0);
+    if (fechados.length >= 3) {
+      const resto = fechados.slice(1).map(x => x.toll).sort((a, b) => a - b);
+      const mediana = resto[Math.floor(resto.length / 2)];
+      if (fechados[0].toll < mediana * 0.5) fechados = fechados.slice(1);
+    }
+    const baseToll = fechados.length ? fechados : meses.filter(x => x.toll > 0);
+    const tollPrev = baseToll.length ? baseToll.reduce((s, x) => s + x.toll, 0) / baseToll.length : null;
+
+    const totalPrev = (combPrev != null || tollPrev != null) ? (combPrev || 0) + (tollPrev || 0) : null;
+    return { ymProx, diasProx, pace, consumo, precoLitro, kmPrev, litrosPrev, combPrev, tollPrev, totalPrev };
+  }
+
+  // Perfil do veículo
+  function fuelVehicle() {
+    if (!state.fuel) state.fuel = { entries: [] };
+    if (!state.fuel.vehicle) state.fuel.vehicle = defaultVehicle();
+    return state.fuel.vehicle;
+  }
+  function setFuelVehicle(patch) { Object.assign(fuelVehicle(), patch); save(); }
+
+  // Manutenção programada (itens { id, desc, value, done })
+  function fuelMaintenance() {
+    if (!state.fuel) state.fuel = { entries: [] };
+    if (!Array.isArray(state.fuel.maintenance)) state.fuel.maintenance = [];
+    return state.fuel.maintenance;
+  }
+  function addMaintenance(item) { fuelMaintenance().push({ id: U.id(), done: false, ...item }); save(); }
+  function updateMaintenance(id, patch) { const it = fuelMaintenance().find(x => x.id === id); if (it) { Object.assign(it, patch); save(); } }
+  function removeMaintenance(id) { state.fuel.maintenance = fuelMaintenance().filter(x => x.id !== id); save(); }
+
+  // Km atual = maior hodômetro registrado
+  function fuelKmAtual() {
+    const ods = (state.fuel && state.fuel.entries ? state.fuel.entries : []).map(e => e.odometer).filter(v => v != null);
+    return ods.length ? Math.max(...ods) : null;
+  }
+  // Ritmo médio (km/dia) entre o primeiro e o último registro com hodômetro
+  function fuelPaceKmDia() {
+    const list = fuelEntries().filter(e => e.odometer != null);
+    if (list.length < 2) return null;
+    const a = list[0], b = list[list.length - 1];
+    const dias = (new Date(b.date) - new Date(a.date)) / 86400000;
+    return dias > 0 ? (b.odometer - a.odometer) / dias : null;
+  }
+  // Consumo médio real por combustível (km/l), a partir dos intervalos tanque cheio → tanque cheio
+  function fuelConsumoPorFuel() {
+    const comp = fuelEntriesComputed().filter(e => e.kmL != null && e.segLiters != null);
+    const acc = {};
+    for (const e of comp) {
+      const f = e.fuelType || "?";
+      if (!acc[f]) acc[f] = { dist: 0, liters: 0 };
+      acc[f].dist += e.segDist; acc[f].liters += e.segLiters;
+    }
+    const out = {};
+    for (const f in acc) out[f] = acc[f].liters > 0 ? acc[f].dist / acc[f].liters : null;
+    return out;
+  }
+  // Último preço informado de um combustível (para pré-preencher o comparador)
+  function fuelUltimoPreco(fuelType) {
+    const list = fuelEntries().filter(e => e.fuelType === fuelType && e.pricePerLiter != null);
+    return list.length ? list[list.length - 1].pricePerLiter : null;
+  }
+
   // ---------- Exportar / importar ----------
   function exportJSON() { return JSON.stringify(state, null, 2); }
   function importJSON(txt) {
@@ -472,6 +692,10 @@ const Store = (() => {
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
+    fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
+    fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance,
+    fuelKmAtual, fuelPaceKmDia, fuelConsumoPorFuel, fuelUltimoPreco,
+    fuelGastoPorMes, fuelPrevisaoProxMes,
     exportJSON, importJSON, resetAll
   };
 })();

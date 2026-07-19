@@ -1,7 +1,14 @@
-# Controle Financeiro
+# Gestão Pessoal
 
-App web de finanças pessoais (HTML + CSS + JavaScript puro, sem framework nem build).
+App web de controles pessoais (HTML + CSS + JavaScript puro, sem framework nem build).
 Interface em português (pt-BR). Roda 100% no navegador.
+
+**Guarda-chuva de controles**: o app se chama **Gestão Pessoal** e agrupa vários controles selecionáveis
+por um botão **"Controles"** ao lado do nome (na `.brand`). Hoje há dois: **💰 Financeiro** (o original,
+completo) e **⛽ Combustível** (consumo do carro). Cada controle tem seu próprio conjunto de abas; trocar
+de controle troca o menu inteiro e renderiza a primeira aba dele. A escolha fica salva em `localStorage`
+(`gestao-controle-ativo`) e reabre no último controle usado. **Configurações** aparece em todos os
+controles (cuida da sincronização/backup do app inteiro).
 
 ## Como executar
 
@@ -26,8 +33,19 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub.
 - `js/ui.js` — `UI`: modal genérico, confirmação, selects.
 - `js/views/*.js` — uma view por aba (`ViewDashboard`, `ViewFluxo`, `ViewLancamentos`, `ViewCartoes`,
-  `ViewEmprestimos`, `ViewInvestimentos`, `ViewOrcamento`, `ViewConfig`), cada uma com `render(root)`.
-- `js/app.js` — `App`: roteador por hash (`#dashboard`, `#fluxo`, ...) e `boot()`.
+  `ViewEmprestimos`, `ViewInvestimentos`, `ViewOrcamento`, `ViewCombustivel`, `ViewAbastecimentos`,
+  `ViewVeiculo`, `ViewConfig`), cada uma com `render(root)`. `combustivel.js` exporta **três** views
+  (`ViewCombustivel` = Resumo, `ViewAbastecimentos` = lista, `ViewVeiculo` = perfil/revisão/manutenção) +
+  o form compartilhado `ViewCombustivel.abrirForm(entry)` e `ViewCombustivel.abrirImportar()`.
+- `js/views/inicio.js` — a **tela inicial (lançador)** `ViewInicio` (botões Financeiro / Combustível /
+  Adicionar / Atualizar), o menu **`Adicionar.abrirMenu()`** (Compra no cartão / Compra parcelada /
+  Abastecimento / Recebido / Pago) e **`Marcar.abrir(kind)`** (marca um item FIXO do fluxo como
+  RECEBIDO/receita ou PAGO/despesa via `Store.setCell`, atualizando saldo/fluxo/dashboard).
+- `js/app.js` — `App`: roteador por hash com **múltiplos controles**. `App.controles` mapeia cada controle
+  (`inicio`, `financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. O controle `inicio` é a tela
+  lançadora (sem abas — a nav fica vazia). `boot()` monta o seletor de controles + o botão **➕ Adicionar**
+  na `.brand`, e **abre sempre na tela inicial** (`#inicio`). `App.trocarControle(id)` troca o controle
+  inteiro. Rotas por hash (`#inicio`, `#dashboard`, `#combustivel`, ...) resolvidas no controle ativo.
 
 Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render()`.
 
@@ -38,7 +56,7 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (2) um **Gist privado** do GitHub (sincronização, protegido por token pessoal — nunca acessível pelo agente).
 - Backup: `Configurações → Exportar/Importar` (JSON). Para validar cálculos com dados reais,
   peça ao usuário o backup exportado e carregue via `Store.importJSON` — não há outro acesso aos dados.
-- **Migração**: `Store.migrate` versiona o estado (`state.version`, atual = 5) e só **acrescenta**
+- **Migração**: `Store.migrate` versiona o estado (`state.version`, atual = 6) e só **acrescenta**
   campos, preservando os dados existentes.
 
 ## Convenções de cálculo (decisões importantes — não quebrar)
@@ -97,10 +115,51 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   "Patrimônio investido" do topo foram removidos (`Store.despesasPorCategoria`/`catName` seguem no store,
   sem uso no dashboard).
 
+- **Combustível (controle ⛽)**: dados em `state.fuel.entries` (entram na sincronização/backup, migração v6).
+  Cada registro: `{ id, date, odometer (km), liters, pricePerLiter, total, fuelType (gasolina|alcool|diesel|gnv),
+  local, toll (pedágio), obs, full (tanque cheio) }`. Registros **só de pedágio** (viagem sem abastecer) têm
+  `liters` null e guardam só o `toll`. Se o form recebe só um de `pricePerLiter`/`total`, o outro é derivado.
+  **Consumo (km/l) = tanque cheio → tanque cheio** (`Store.fuelEntriesComputed`): acumula os litros desde o
+  último tanque cheio (somando parciais) e no próximo cheio faz `kmL = (odo − odoÚltimoCheio) / litrosDoIntervalo`;
+  não calcula em intervalos que **misturam combustíveis** (ex.: transição gasolina→álcool) nem em parciais.
+  `custoKm = pagoNoIntervalo / dist`. **Pedágio é separado** (informativo): NÃO entra no gasto de combustível
+  nos KPIs; `fuelStats` devolve `tollMes`/`tollTotal` à parte. `Store.fuelStats(ym)` dá consumo médio/último
+  (blended entre combustíveis), custo/km, gasto do mês (só combustível), preço médio do litro, km do mês, pedágio.
+  Aba **Resumo** (`ViewCombustivel`) = KPIs + últimos abastecimentos; aba **Abastecimentos** (`ViewAbastecimentos`)
+  = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): cola JSON
+  (`date, km, fuel, local, liters, price, paid, toll, obs`), `Store.addFuelMany`/`clearFuel`. Import marca como
+  **parcial** o que a obs indica (parcial/mínimo/reforço) **ou** dois abastecimentos no mesmo hodômetro (não
+  fecham tanque). **Nunca versionar dados reais do usuário** — a importação roda só no navegador dele
+  (nem placeholders de exemplo no código podem conter dados reais do usuário).
+  - **Aba Veículo** (`ViewVeiculo`): `state.fuel.vehicle` = `{ modelo, tanque, pneu, revisaoKm, consumoAlcool,
+    consumoGasolina }` (init idempotente no `migrate`, sem bump de versão) e `state.fuel.maintenance` =
+    `[{ id, desc, value, done }]`. **Km atual** = `Store.fuelKmAtual()` (maior hodômetro). **Contador de
+    revisão**: `revisaoKm − kmAtual` + previsão de data por `Store.fuelPaceKmDia()` (km/dia entre 1º e último
+    registro). **Manutenção**: total previsto e "ainda a pagar" (itens não `done`).
+  - **Comparador álcool/gasolina** (card no Resumo): usa `Store.fuelConsumoPorFuel()` (consumo real por
+    combustível, dos intervalos válidos) — ou o consumo do perfil, senão fallback 11 / 17,4. Custo/km =
+    preço ÷ consumo; **ponto de virada** = `precoGasolina × (consumoAlcool / consumoGasolina)`. Pré-preenche
+    com `Store.fuelUltimoPreco(fuel)`.
+  - **Dashboard (1ª aba)**: além dos KPIs, tem o card **Previsão para <próximo mês>** (`Store.fuelPrevisaoProxMes`:
+    combustível = ritmo km/dia ÷ consumo médio × preço recente do litro; pedágio = média dos meses fechados,
+    descartando o 1º se for parcial) e o gráfico **Gasto por mês** (`Store.fuelGastoPorMes` via `Charts.barsH`,
+    com a barra da previsão).
+  - **Pagamento no cartão** (integração com o Financeiro): o form de abastecimento tem **Forma de pagamento**
+    (— não lançar — / 💳 Cartão). No cartão, cria um `cardTx` (fatura = mês do abastecimento **+ 1**) e vincula
+    por `entry.linkCardTxId` (+ `payment: "cartao"`, `cardId`). **Editar** o abastecimento remove o `cardTx`
+    antigo e recria; **excluir** remove o `cardTx`. A **importação NÃO cria** lançamentos (é histórico) e o
+    **pedágio fica de fora** da integração. Só cartão por enquanto (pix/dinheiro não foram pedidos).
+
 ## Convenções de UI
 
-- **Sempre abre no Dashboard**: `App.boot` força `#dashboard` via `history.replaceState`, ignorando a
-  última aba salva no hash da URL ao reabrir.
+- **Abre sempre na tela inicial (lançador)**: `App.boot` força `controleAtivo = "inicio"` e `#inicio`
+  (decisão do usuário). De lá o usuário entra num controle (`trocarControle` → 1ª aba dele) ou usa Adicionar.
+- **Seletor de controles + Adicionar** (`.brand`): botão "Controles ▾" abre `.ctrl-menu` (🏠 Início /
+  💰 Financeiro / ⛽ Combustível; o ativo recebe `.ativo`) e o botão **➕ Adicionar** (`Adicionar.abrirMenu`)
+  fica logo abaixo, disponível em qualquer tela. Fecha ao clicar fora. No mobile a `.brand` vira linha.
+- **Integração pelo Adicionar**: um lançamento atualiza os dois controles — Compra → `ViewCartoes.abrirNovaCompra`
+  (cartão + parcelas); Abastecimento → `ViewCombustivel.abrirForm` (pode cair no cartão); Recebido/Pago →
+  `Marcar.abrir` marca item fixo do fluxo (setCell com status), mexendo no saldo/fluxo/dashboard.
 - Tabelas largas rolam dentro do `.card` no mobile (media query ≤700px); tabela de investimentos usa `.tbl-wide`.
 - Quadros/linhas com `data-goto` navegam para a aba (`.clickable[data-goto]` no dashboard).
 - Estilo por tokens CSS em `:root` (tema claro/escuro via `prefers-color-scheme`).
@@ -127,11 +186,32 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Última versão **publicada na `main`**: `v18` / cache `202607201000`. **Nada pendente para publicar** —
-a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário está satisfeito e volta
-quando quiser ajustar algo novo.
+**PUBLICADO**: a `v19` / cache `202607192000` foi para a `main` (PR → merge) e está no ar pelo GitHub Pages.
+O app virou **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial
+lançadora. O usuário vai validar o funcionamento online. Próximas melhorias entram na mesma branch
+`claude/project-updates-2r7rf9` (reiniciada a partir da `main` após o merge) → novo PR → merge.
 
-No ar (v18) e estável:
+No ar (v19), validado em headless com os dados reais do usuário (**nada de dado real foi versionado**):
+- **Tela inicial (lançador)** `ViewInicio`: o app **abre sempre nela** com 4 botões — Financeiro, Combustível,
+  ➕ Adicionar, 🔄 Atualizar. O botão **➕ Adicionar** também fica na `.brand` (sempre acessível) e abre o menu
+  Compra / Compra parcelada / Abastecimento / Recebido / Pago, integrando os dois controles (ver convenções).
+- **Gestão Pessoal** + **seletor de Controles** na `.brand` (botão "Controles ▾" → 🏠 Início / 💰 Financeiro /
+  ⛽ Combustível). Troca o controle inteiro (nav + view), salva a escolha em `localStorage`. Configurações
+  aparece nos dois controles.
+- **Controle de Combustível** (`state.fuel`, migração v6): abas **Resumo** (KPIs de consumo/custo + comparador
+  álcool×gasolina + últimos), **Abastecimentos** (lista completa + 📥 Importar JSON) e **Veículo** (perfil +
+  contador de revisão + manutenção programada). Consumo **tanque cheio → tanque cheio**; **pedágio separado**
+  (informativo). Ver a seção "Combustível (controle ⛽)" nas convenções de cálculo.
+- O usuário tem um **histórico real de combustível** (veículo flex, rota fixa entre duas cidades, transição
+  gasolina→álcool, dezenas de abastecimentos). Foi usado só para **validar localmente** (scratchpad da sessão,
+  não versionado); consumo real bate com os cálculos (álcool compensa no uso dele). **Os dados reais NUNCA vão
+  ao repositório** — vivem só no aparelho/Gist do usuário. Para revalidar, pedir o histórico de novo.
+
+Ideias que ficaram na mesa para o Combustível (usuário vai escolher): custo por viagem (trecho + pedágio),
+gráfico do preço do litro no tempo, KPI de consumo separado por combustível, alerta de revisão mais visível,
+metas/orçamento de combustível por mês.
+
+No ar (v18) e estável no controle Financeiro:
 - **Empréstimo simétrico ao fluxo**: marcar parcela como PAGO grava `settledAt` e o valor cai no
   `saldoContaAtual` (sai do "a receber", entra no saldo — sem lançamento manual).
 - **Cards Receitas/Despesas do mês** (topo, informativos do mês atual): separados **pelo sinal** do
