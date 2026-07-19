@@ -570,6 +570,58 @@ const Store = (() => {
     };
   }
 
+  // Gasto por mês (combustível e pedágio separados), do mais antigo ao mais novo
+  function fuelGastoPorMes() {
+    const comp = fuelEntriesComputed();
+    const map = {};
+    for (const e of comp) {
+      const ym = (e.date || "").slice(0, 7);
+      if (!ym) continue;
+      if (!map[ym]) map[ym] = { ym, comb: 0, toll: 0, litros: 0, km: 0 };
+      map[ym].comb += e.total || 0;
+      map[ym].toll += e.toll || 0;
+      map[ym].litros += e.liters || 0;
+      map[ym].km += e.dist || 0;
+    }
+    return Object.values(map).sort((a, b) => a.ym.localeCompare(b.ym));
+  }
+
+  // Previsão de gasto para o PRÓXIMO mês (para o usuário se programar).
+  // Combustível estimado pelo ritmo real (km/dia) ÷ consumo médio × preço recente do litro;
+  // pedágio pela média mensal dos meses já fechados. Pedágio fica separado (informativo).
+  function fuelPrevisaoProxMes() {
+    const pace = fuelPaceKmDia();
+    const stats = fuelStats();
+    const consumo = stats.consumoMedio;
+    const meses = fuelGastoPorMes();
+    const ymAtual = U.ymHoje();
+    const ymProx = U.ymAdd(ymAtual, 1);
+    const { y, m } = U.ymParse(ymProx);
+    const diasProx = new Date(y, m, 0).getDate();
+
+    // preço médio recente do litro: último mês com litros
+    let precoLitro = null;
+    for (let i = meses.length - 1; i >= 0; i--) { if (meses[i].litros > 0) { precoLitro = meses[i].comb / meses[i].litros; break; } }
+
+    const kmPrev = pace != null ? pace * diasProx : null;
+    const litrosPrev = (kmPrev != null && consumo) ? kmPrev / consumo : null;
+    const combPrev = (litrosPrev != null && precoLitro != null) ? litrosPrev * precoLitro : null;
+
+    // pedágio médio mensal — usa meses fechados (anteriores ao atual). Descarta o 1º mês quando
+    // for claramente parcial (pedágio < metade da mediana dos demais), para não puxar a média pra baixo.
+    let fechados = meses.filter(x => x.ym < ymAtual && x.toll > 0);
+    if (fechados.length >= 3) {
+      const resto = fechados.slice(1).map(x => x.toll).sort((a, b) => a - b);
+      const mediana = resto[Math.floor(resto.length / 2)];
+      if (fechados[0].toll < mediana * 0.5) fechados = fechados.slice(1);
+    }
+    const baseToll = fechados.length ? fechados : meses.filter(x => x.toll > 0);
+    const tollPrev = baseToll.length ? baseToll.reduce((s, x) => s + x.toll, 0) / baseToll.length : null;
+
+    const totalPrev = (combPrev != null || tollPrev != null) ? (combPrev || 0) + (tollPrev || 0) : null;
+    return { ymProx, diasProx, pace, consumo, precoLitro, kmPrev, litrosPrev, combPrev, tollPrev, totalPrev };
+  }
+
   // Perfil do veículo
   function fuelVehicle() {
     if (!state.fuel) state.fuel = { entries: [] };
@@ -643,6 +695,7 @@ const Store = (() => {
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance,
     fuelKmAtual, fuelPaceKmDia, fuelConsumoPorFuel, fuelUltimoPreco,
+    fuelGastoPorMes, fuelPrevisaoProxMes,
     exportJSON, importJSON, resetAll
   };
 })();

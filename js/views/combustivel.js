@@ -190,22 +190,47 @@ const ViewCombustivel = (() => {
     const { m, y } = U.ymParse(U.ymHoje());
     const comp = Store.fuelEntriesComputed().filter(e => e.liters != null && e.liters > 0);
     const ultimos = comp.slice(-6).reverse();
+    const prev = Store.fuelPrevisaoProxMes();
+    const mesProx = U.ymParse(prev.ymProx);
 
     root.innerHTML = `
       <div class="page-head">
-        <h1>⛽ Combustível</h1>
+        <h1>📊 Combustível</h1>
         <span class="muted">${U.MESES[m - 1]} de ${y}</span>
         <div class="spacer"></div>
         <button class="btn-primary" id="btn-abast">+ Abastecimento</button>
       </div>
       <div class="cards-grid">
         ${statCard("Consumo médio", kmL(s.consumoMedio), "tanque cheio → tanque cheio", "abastecimentos")}
-        ${statCard("Último consumo", kmL(s.ultimoConsumo), "do último tanque cheio", "abastecimentos")}
         ${statCard("Custo por km", s.custoKmMedio != null ? U.brl(s.custoKmMedio) : "—", "só combustível", "abastecimentos")}
         ${statCard("Gasto do mês", U.brl(s.gastoMes), `${s.nMes} abastecimento(s) · ${lit(s.litrosMes)}`, "abastecimentos")}
         ${statCard("Preço médio do litro", s.precoMedioMes != null ? U.brl(s.precoMedioMes) : "—", `no mês de ${U.MESES[m - 1]}`, "abastecimentos")}
         ${statCard("Km rodados no mês", km(s.kmMes), "entre os registros do mês", "abastecimentos")}
         ${statCard("🛣️ Pedágio do mês", U.brl(s.tollMes), `total pago: ${U.brl(s.tollTotal)}`, "abastecimentos")}
+      </div>
+      <div class="grid-2">
+        <div class="card previsao-card">
+          <div class="stat-label">📅 Previsão para ${U.MESES[mesProx.m - 1]}</div>
+          <div class="stat-value num ${prev.totalPrev != null ? "" : "muted"}">${prev.totalPrev != null ? "~" + U.brl(prev.totalPrev) : "—"}</div>
+          <div class="stat-sub">gasto aproximado do próximo mês (combustível + pedágio)</div>
+          ${prev.totalPrev != null ? `
+          <table class="tbl mt"><tbody>
+            <tr><td>⛽ Combustível</td><td class="num">${prev.combPrev != null ? "~" + U.brl(prev.combPrev) : "—"}</td></tr>
+            <tr><td>🛣️ Pedágio</td><td class="num">${prev.tollPrev != null ? "~" + U.brl(prev.tollPrev) : "—"}</td></tr>
+            <tr><td><b>Total</b></td><td class="num"><b>${"~" + U.brl(prev.totalPrev)}</b></td></tr>
+          </tbody></table>
+          <div class="muted" style="font-size:11.5px;margin-top:8px">
+            Base: ~${prev.kmPrev != null ? prev.kmPrev.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "—"} km no mês
+            (ritmo ${prev.pace != null ? prev.pace.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "—"} km/dia)
+            · consumo ${prev.consumo != null ? prev.consumo.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"} km/l
+            · litro ~${prev.precoLitro != null ? U.brl(prev.precoLitro) : "—"}. Pedágio = média dos meses anteriores.
+          </div>` : `<p class="empty">Cadastre alguns abastecimentos para o app estimar o próximo mês.</p>`}
+        </div>
+        <div class="card">
+          <b style="font-size:15px">Gasto por mês</b>
+          <div class="muted" style="font-size:12px;margin:2px 0 8px">combustível (pedágio à parte)</div>
+          <div id="comb-mes-chart"></div>
+        </div>
       </div>
       <div class="grid-2">
         ${comparadorHTML()}
@@ -221,6 +246,17 @@ const ViewCombustivel = (() => {
     root.querySelector("#btn-abast").addEventListener("click", () => abrirForm(null));
     ligarGoto(root);
     ligarComparador(root);
+
+    // Gráfico de gasto por mês (combustível) + barra da previsão do próximo mês
+    const chartEl = root.querySelector("#comb-mes-chart");
+    const meses = Store.fuelGastoPorMes();
+    if (!meses.length) {
+      chartEl.innerHTML = `<p class="empty">Sem dados ainda.</p>`;
+    } else {
+      const rows = meses.slice(-6).map(x => ({ label: U.MESES_ABREV[U.ymParse(x.ym).m - 1], value: Math.round(x.comb) }));
+      if (prev.combPrev != null) rows.push({ label: U.MESES_ABREV[mesProx.m - 1] + " (prev.)", value: Math.round(prev.combPrev) });
+      Charts.barsH(chartEl, rows);
+    }
 
     const wrap = root.querySelector("#comb-ultimos");
     if (!ultimos.length) {
