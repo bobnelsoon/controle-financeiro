@@ -15,15 +15,12 @@ const ViewDashboard = (() => {
     // Receitas/despesas do mês: itens do fluxo + lançamentos avulsos.
     // O item "Cartão (fatura)" é ignorado aqui porque o gasto do cartão entra pela
     // fatura vigente (gastoCartao), evitando contar a fatura do mês já paga em dobro.
-    let receitas = 0, despesas = 0, receitasFixasAReceber = 0;
+    let receitas = 0, despesas = 0;
     for (const it of st.flowItems) {
       if (it.autoCartao) continue;
       const v = Store.plannedValue(it, ymAtual);
       if (v == null) continue;
       if (v > 0) receitas += v; else despesas += v;
-      // Só receitas fixas que ainda faltam receber (Recebido → projectedValue 0, já está no saldo).
-      const proj = Store.projectedValue(it, ymAtual);
-      if (proj != null && proj > 0) receitasFixasAReceber += proj;
     }
     for (const t of Store.txDoMes(ymAtual)) {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
@@ -37,10 +34,24 @@ const ViewDashboard = (() => {
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Disponível no mês = o que já está na conta + as receitas fixas que ainda faltam receber.
-    // Lançamentos e receitas já recebidas NÃO entram (já estão embutidos no saldo), então o
-    // número fica estável e não infla a cada lançamento.
-    const disponivelMes = saldoConta != null ? Math.round((saldoConta + receitasFixasAReceber) * 100) / 100 : null;
+    // Disponível olha o PRÓXIMO mês (ymFatura), igual à fatura/Resultado/Acumulado — o usuário
+    // trabalha sempre com o mês seguinte. "A receber" = receitas fixas do fluxo ainda pendentes +
+    // parcelas de empréstimo (ABERTO) que vencem no próximo mês. Itens já recebidos e lançamentos
+    // NÃO entram (já estão embutidos no saldo), então o número não infla à toa.
+    let receitasAReceberProx = 0;
+    for (const it of st.flowItems) {
+      if (it.autoCartao) continue;
+      const proj = Store.projectedValue(it, ymFatura);
+      if (proj != null && proj > 0) receitasAReceberProx += proj;
+    }
+    let emprestimosAReceberProx = 0;
+    for (const l of st.loans) {
+      for (const p of (l.items || [])) {
+        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymFatura) emprestimosAReceberProx += (p.value || 0);
+      }
+    }
+    const aReceberProx = Math.round((receitasAReceberProx + emprestimosAReceberProx) * 100) / 100;
+    const disponivelMes = saldoConta != null ? Math.round((saldoConta + aReceberProx) * 100) / 100 : null;
     // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
     const pProx = serie.find(p => p.ym === ymFatura);
     const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
@@ -123,6 +134,7 @@ const ViewDashboard = (() => {
           <div class="stat-label">💰 Saldo em conta <button class="btn-sm" id="btn-edit-conta" title="Atualizar saldo">✎</button></div>
           <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
           <div class="stat-sub">${conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar"}</div>
+          <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
         </div>
         <div class="card stat stat-duplo clickable" data-goto="fluxo">
           <div class="stat-label">Receitas do mês</div>
@@ -130,9 +142,9 @@ const ViewDashboard = (() => {
           <div class="stat-sub">fixas + lançamentos</div>
           ${disponivelMes != null ? `
           <div class="stat-linha2">
-            <div class="stat-label">Disponível no mês</div>
+            <div class="stat-label">Disponível em ${U.MESES[mesFatura - 1]}</div>
             <div class="stat-value num ${U.clsValor(disponivelMes)}">${U.brl(disponivelMes)}</div>
-            <div class="stat-sub">saldo em conta + receitas fixas a receber</div>
+            <div class="stat-sub">saldo + receitas e empréstimos a receber de ${U.MESES[mesFatura - 1]}</div>
           </div>` : ""}
         </div>
         <div class="card stat clickable" data-goto="fluxo">
@@ -250,6 +262,11 @@ const ViewDashboard = (() => {
         App.render();
         if (avisos.length) alert("Atualizado com avisos:\n• " + avisos.join("\n• "));
       }
+    });
+
+    root.querySelector("#btn-compra-cartao").addEventListener("click", (e) => {
+      e.stopPropagation();
+      ViewCartoes.abrirNovaCompra(null); // mesma tela da aba Cartões; ao salvar, re-renderiza o dashboard
     });
 
     root.querySelector("#btn-edit-conta").addEventListener("click", (e) => {

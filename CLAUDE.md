@@ -52,9 +52,12 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 - **Saldo em conta é automático e determinístico** (`Store.saldoContaAtual`): parte do valor informado
   (`settings.conta = { at, valor }`) e soma o que foi realizado **depois** da âncora `at`:
-  células do fluxo marcadas Pago/Recebido (com `settledAt`/`settledValue`) e lançamentos pix/débito
-  (com `createdAt`). É recalculado a cada render (seguro para a sincronização). Reinformar o saldo
-  recalibra a âncora (`at = agora`). Compras no cartão NÃO mexem no saldo até a fatura ser paga.
+  células do fluxo marcadas Pago/Recebido (com `settledAt`/`settledValue`), lançamentos pix/débito
+  (com `createdAt`) **e parcelas de empréstimo marcadas PAGO** (com `settledAt`, valor `p.value`). É
+  recalculado a cada render (seguro para a sincronização). Reinformar o saldo recalibra a âncora
+  (`at = agora`). Compras no cartão NÃO mexem no saldo até a fatura ser paga. **Empréstimo simétrico ao
+  fluxo:** marcar uma parcela como PAGO grava `settledAt` e joga `p.value` no saldo — assim o valor sai
+  do "a receber" e entra no saldo automaticamente, sem lançamento manual.
 
 - **Resultado do mês — FONTE ÚNICA `Store.monthTotal(ym)`** (usada pelo Dashboard **e** pelo Fluxo
   Anual, para as duas telas baterem): Σ `projectedValue` dos itens do fluxo (itens Pago/Recebido contam
@@ -124,14 +127,24 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Última versão **publicada na `main`**: `v14` / cache `202607200400` (PRs #1 a #11 mesclados). **Nada
-pendente para publicar** — a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário
-está satisfeito e volta quando quiser ajustar algo novo.
+Última versão **publicada na `main`**: `v18` / cache `202607201000`. **Nada pendente para publicar** —
+a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário está satisfeito e volta
+quando quiser ajustar algo novo.
 
-No ar (v14) e estável:
+No ar (v18) e estável:
+- **Empréstimo simétrico ao fluxo**: marcar parcela como PAGO grava `settledAt` e o valor cai no
+  `saldoContaAtual` (sai do "a receber", entra no saldo — sem lançamento manual).
 - **Cards Receitas/Despesas do mês** (topo, informativos do mês atual): separados **pelo sinal** do
   lançamento — positivo → Receitas, negativo → Despesas (não se misturam; positivo NÃO abate despesa).
   Ambos com subtítulo ("fixas + lançamentos" / "fixas + lançamentos + fatura do cartão").
+- **Card Receitas tem 2 valores** (`.stat-duplo`): "Receitas do mês" (valor principal, informativo do
+  mês atual) e **"Disponível em <mês seguinte>"** (valor secundário, fonte menor). **Disponível =
+  Saldo em conta + tudo a receber no PRÓXIMO mês** (`ymFatura`): Σ `projectedValue > 0` dos flowItems +
+  parcelas de empréstimo ABERTO que vencem no próximo mês. Olha o mês seguinte de propósito (usuário
+  trabalha um mês à frente, igual à fatura/Resultado/Acumulado). Só conta o que ainda falta receber
+  (recebidos e lançamentos já estão no saldo → não conta em dobro; estável ao receber). Só aparece se o
+  saldo foi informado. Botão **"Compra no cartão"** no card **Saldo em conta** (largura total, ancorado
+  na base via flex-column) abre `ViewCartoes.abrirNovaCompra` — lançar compra sem ir na aba Cartões.
 - **Dashboard**: seção de investimentos no rodapé (**Carteira de investimentos** + **Composição da
   carteira**); saiu o gráfico "Despesas por categoria" e o KPI "Patrimônio investido" do topo.
 - **iPhone / safe areas** (v12): `viewport-fit=cover`, metas de web app, `theme-color`,
