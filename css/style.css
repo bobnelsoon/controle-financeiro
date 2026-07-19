@@ -124,7 +124,9 @@ body {
   .sidebar {
     width: 100%; flex: none; height: auto; position: sticky; top: 0; z-index: 20;
     display: flex; align-items: center; gap: 6px;
-    padding: 8px 10px; border-right: none; border-bottom: 1px solid var(--border);
+    border-right: none; border-bottom: 1px solid var(--border);
+    /* Respeita a Dynamic Island / notch (topo e laterais em paisagem) */
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
   }
   .brand { padding: 0 8px 0 2px; font-size: 14px; white-space: nowrap; }
   .brand small { display: none; }
@@ -134,7 +136,8 @@ body {
   }
   .nav::-webkit-scrollbar { display: none; }
   .nav a { padding: 7px 9px; font-size: 12.5px; white-space: nowrap; }
-  .main { padding: 14px 12px 50px; }
+  /* Conteúdo respeita a barra de gesto embaixo e o notch nas laterais (paisagem) */
+  .main { padding: 14px max(12px, env(safe-area-inset-right)) max(50px, calc(env(safe-area-inset-bottom) + 24px)) max(12px, env(safe-area-inset-left)); }
   .fluxo-wrap { overflow-x: auto; }
 
   /* Tabelas largas rolam dentro do próprio card em vez de vazar/cortar na tela */
@@ -264,6 +267,7 @@ table.fluxo { border-collapse: collapse; font-size: 12.5px; min-width: 1080px; }
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.35);
   display: flex; align-items: center; justify-content: center; z-index: 50;
+  padding: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px);
 }
 .modal {
   background: var(--surface); border-radius: 14px; border: 1px solid var(--border);
