@@ -110,6 +110,19 @@ const ViewCombustivel = (() => {
     const formaSel = ov.querySelector("#comb-forma");
     const cardBox = ov.querySelector("#comb-cartao-box");
     if (formaSel && cardBox) formaSel.addEventListener("change", () => { cardBox.style.display = formaSel.value === "cartao" ? "block" : "none"; });
+
+    // Soma automática: preço × litros = total (e total ÷ litros = preço), ao vivo enquanto digita.
+    const litersEl = ov.querySelector('input[name="liters"]');
+    const priceEl = ov.querySelector('input[name="price"]');
+    const totalEl = ov.querySelector('input[name="total"]');
+    const fmt = (v) => (Math.round(v * 100) / 100).toFixed(2).replace(".", ",");
+    if (litersEl && priceEl && totalEl) {
+      const calcTotal = () => { const l = num(litersEl.value), pr = num(priceEl.value); if (l != null && l > 0 && pr != null) totalEl.value = fmt(l * pr); };
+      const calcPreco = () => { const l = num(litersEl.value), t = num(totalEl.value); if (l != null && l > 0 && t != null) priceEl.value = fmt(t / l); };
+      litersEl.addEventListener("input", calcTotal);
+      priceEl.addEventListener("input", calcTotal);
+      totalEl.addEventListener("input", calcPreco);
+    }
   }
 
   // Importar histórico colado em JSON (roda no navegador do usuário; nada sai do aparelho).
