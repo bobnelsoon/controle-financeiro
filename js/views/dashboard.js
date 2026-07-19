@@ -15,15 +15,12 @@ const ViewDashboard = (() => {
     // Receitas/despesas do mês: itens do fluxo + lançamentos avulsos.
     // O item "Cartão (fatura)" é ignorado aqui porque o gasto do cartão entra pela
     // fatura vigente (gastoCartao), evitando contar a fatura do mês já paga em dobro.
-    let receitas = 0, despesas = 0, receitasFixasAReceber = 0;
+    let receitas = 0, despesas = 0;
     for (const it of st.flowItems) {
       if (it.autoCartao) continue;
       const v = Store.plannedValue(it, ymAtual);
       if (v == null) continue;
       if (v > 0) receitas += v; else despesas += v;
-      // Só receitas fixas que ainda faltam receber (Recebido → projectedValue 0, já está no saldo).
-      const proj = Store.projectedValue(it, ymAtual);
-      if (proj != null && proj > 0) receitasFixasAReceber += proj;
     }
     for (const t of Store.txDoMes(ymAtual)) {
       if (t.value > 0) receitas += t.value; else despesas += t.value;
@@ -37,19 +34,24 @@ const ViewDashboard = (() => {
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Parcelas de empréstimo A RECEBER (ABERTO) que vencem neste mês — também são recebíveis.
-    // Empréstimos não mexem no saldoContaAtual, então somar aqui não conta em dobro.
-    let emprestimosAReceber = 0;
+    // Disponível olha o PRÓXIMO mês (ymFatura), igual à fatura/Resultado/Acumulado — o usuário
+    // trabalha sempre com o mês seguinte. "A receber" = receitas fixas do fluxo ainda pendentes +
+    // parcelas de empréstimo (ABERTO) que vencem no próximo mês. Itens já recebidos e lançamentos
+    // NÃO entram (já estão embutidos no saldo), então o número não infla à toa.
+    let receitasAReceberProx = 0;
+    for (const it of st.flowItems) {
+      if (it.autoCartao) continue;
+      const proj = Store.projectedValue(it, ymFatura);
+      if (proj != null && proj > 0) receitasAReceberProx += proj;
+    }
+    let emprestimosAReceberProx = 0;
     for (const l of st.loans) {
       for (const p of (l.items || [])) {
-        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymAtual) emprestimosAReceber += (p.value || 0);
+        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymFatura) emprestimosAReceberProx += (p.value || 0);
       }
     }
-    // Disponível no mês = o que já está na conta + tudo que ainda falta receber neste mês
-    // (receitas fixas do fluxo + parcelas de empréstimo a receber). Lançamentos e itens já
-    // recebidos NÃO entram (já estão embutidos no saldo), então o número não infla à toa.
-    const aReceberMes = Math.round((receitasFixasAReceber + emprestimosAReceber) * 100) / 100;
-    const disponivelMes = saldoConta != null ? Math.round((saldoConta + aReceberMes) * 100) / 100 : null;
+    const aReceberProx = Math.round((receitasAReceberProx + emprestimosAReceberProx) * 100) / 100;
+    const disponivelMes = saldoConta != null ? Math.round((saldoConta + aReceberProx) * 100) / 100 : null;
     // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
     const pProx = serie.find(p => p.ym === ymFatura);
     const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
@@ -140,9 +142,9 @@ const ViewDashboard = (() => {
           <div class="stat-sub">fixas + lançamentos</div>
           ${disponivelMes != null ? `
           <div class="stat-linha2">
-            <div class="stat-label">Disponível no mês</div>
+            <div class="stat-label">Disponível em ${U.MESES[mesFatura - 1]}</div>
             <div class="stat-value num ${U.clsValor(disponivelMes)}">${U.brl(disponivelMes)}</div>
-            <div class="stat-sub">saldo + receitas e empréstimos a receber no mês</div>
+            <div class="stat-sub">saldo + receitas e empréstimos a receber de ${U.MESES[mesFatura - 1]}</div>
           </div>` : ""}
         </div>
         <div class="card stat clickable" data-goto="fluxo">
