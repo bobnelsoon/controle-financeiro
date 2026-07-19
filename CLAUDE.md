@@ -110,13 +110,20 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   sem uso no dashboard).
 
 - **Combustível (controle ⛽)**: dados em `state.fuel.entries` (entram na sincronização/backup, migração v6).
-  Cada abastecimento: `{ id, date, odometer (km do hodômetro), liters, pricePerLiter, total, fuelType, station, full }`.
-  Se o form recebe só um de `pricePerLiter`/`total`, o outro é derivado (`total = liters*preço`, `preço = total/liters`).
-  **Consumo (km/l) = método tanque a tanque**: `Store.fuelEntriesComputed()` ordena por hodômetro e, para cada
-  abastecimento, calcula `dist = odo − odo_anterior`, `kmL = dist / liters` e `custoKm = total / dist` (só quando
-  há hodômetro nos dois). `Store.fuelStats(ym)` devolve consumo médio/último, custo/km médio, gasto do mês, preço
-  médio do litro no mês, km rodados no mês, etc. Aba **Resumo** (`ViewCombustivel`) = KPIs + últimos abastecimentos;
-  aba **Abastecimentos** (`ViewAbastecimentos`) = lista completa com adicionar/editar/excluir.
+  Cada registro: `{ id, date, odometer (km), liters, pricePerLiter, total, fuelType (gasolina|alcool|diesel|gnv),
+  local, toll (pedágio), obs, full (tanque cheio) }`. Registros **só de pedágio** (viagem sem abastecer) têm
+  `liters` null e guardam só o `toll`. Se o form recebe só um de `pricePerLiter`/`total`, o outro é derivado.
+  **Consumo (km/l) = tanque cheio → tanque cheio** (`Store.fuelEntriesComputed`): acumula os litros desde o
+  último tanque cheio (somando parciais) e no próximo cheio faz `kmL = (odo − odoÚltimoCheio) / litrosDoIntervalo`;
+  não calcula em intervalos que **misturam combustíveis** (ex.: transição gasolina→álcool) nem em parciais.
+  `custoKm = pagoNoIntervalo / dist`. **Pedágio é separado** (informativo): NÃO entra no gasto de combustível
+  nos KPIs; `fuelStats` devolve `tollMes`/`tollTotal` à parte. `Store.fuelStats(ym)` dá consumo médio/último
+  (blended entre combustíveis), custo/km, gasto do mês (só combustível), preço médio do litro, km do mês, pedágio.
+  Aba **Resumo** (`ViewCombustivel`) = KPIs + últimos abastecimentos; aba **Abastecimentos** (`ViewAbastecimentos`)
+  = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): cola JSON
+  (`date, km, fuel, local, liters, price, paid, toll, obs`), `Store.addFuelMany`/`clearFuel`. Import marca como
+  **parcial** o que a obs indica (parcial/mínimo/reforço) **ou** dois abastecimentos no mesmo hodômetro (não
+  fecham tanque). **Nunca versionar dados reais do usuário** — a importação roda só no navegador dele.
 
 ## Convenções de UI
 
