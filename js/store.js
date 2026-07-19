@@ -10,7 +10,7 @@ const Store = (() => {
   // tudo chega pela sincronização (os dados pessoais não vão no código publicado).
   function seedVazio() {
     return {
-      version: 5,
+      version: 6,
       settings: { anoInicial: 2026, conta: null },
       categories: categoriasPadrao(),
       accounts: [],
@@ -20,7 +20,8 @@ const Store = (() => {
       loans: [],
       budgets: {},
       cardTx: [],
-      investments: { assets: [], fixed: [], quotes: {}, history: [] }
+      investments: { assets: [], fixed: [], quotes: {}, history: [] },
+      fuel: { entries: [] }
     };
   }
 
@@ -124,6 +125,11 @@ const Store = (() => {
         for (const a of st.investments.assets) if (a.avgPrice === undefined) a.avgPrice = null;
       }
       st.version = 5;
+    }
+    if (st.version < 6) {
+      // Novo controle: Combustível (consumo). Só acrescenta o campo, nada existente muda.
+      if (!st.fuel) st.fuel = { entries: [] };
+      st.version = 6;
     }
     return st;
   }
@@ -452,6 +458,62 @@ const Store = (() => {
     return t;
   }
 
+  // ---------- Combustível (controle de consumo) ----------
+  // Abastecimentos ordenados do mais antigo ao mais novo (por hodômetro, data como desempate).
+  function fuelEntries() {
+    return (state.fuel && state.fuel.entries ? state.fuel.entries : []).slice().sort((a, b) => {
+      if (a.odometer != null && b.odometer != null && a.odometer !== b.odometer) return a.odometer - b.odometer;
+      return (a.date || "").localeCompare(b.date || "");
+    });
+  }
+
+  function addFuel(e) {
+    if (!state.fuel) state.fuel = { entries: [] };
+    state.fuel.entries.push({ id: U.id(), ...e });
+    save();
+  }
+  function updateFuel(id, patch) {
+    const e = (state.fuel.entries || []).find(x => x.id === id);
+    if (e) { Object.assign(e, patch); save(); }
+  }
+  function removeFuel(id) {
+    state.fuel.entries = (state.fuel.entries || []).filter(x => x.id !== id);
+    save();
+  }
+
+  // Consumo de cada abastecimento (km/l) pelo método "tanque a tanque":
+  // distância desde o abastecimento anterior ÷ litros deste. Só calcula quando há hodômetro nos dois.
+  function fuelEntriesComputed() {
+    const list = fuelEntries();
+    return list.map((e, i) => {
+      const prev = i > 0 ? list[i - 1] : null;
+      let dist = null, kmL = null, custoKm = null;
+      if (prev && e.odometer != null && prev.odometer != null && e.odometer > prev.odometer) {
+        dist = e.odometer - prev.odometer;
+        if (e.liters > 0) kmL = dist / e.liters;
+        if (dist > 0 && e.total != null) custoKm = e.total / dist;
+      }
+      return { ...e, dist, kmL, custoKm };
+    });
+  }
+
+  function fuelStats(ym) {
+    const alvo = ym || U.ymHoje();
+    const comp = fuelEntriesComputed();
+    const consumos = comp.filter(e => e.kmL != null).map(e => e.kmL);
+    const consumoMedio = consumos.length ? consumos.reduce((a, b) => a + b, 0) / consumos.length : null;
+    const ultimoConsumo = consumos.length ? consumos[consumos.length - 1] : null;
+    const custos = comp.filter(e => e.custoKm != null).map(e => e.custoKm);
+    const custoKmMedio = custos.length ? custos.reduce((a, b) => a + b, 0) / custos.length : null;
+    const doMes = comp.filter(e => (e.date || "").slice(0, 7) === alvo);
+    const gastoMes = doMes.reduce((s, e) => s + (e.total || 0), 0);
+    const litrosMes = doMes.reduce((s, e) => s + (e.liters || 0), 0);
+    const precoMedioMes = litrosMes > 0 ? gastoMes / litrosMes : null;
+    const kmMes = doMes.reduce((s, e) => s + (e.dist || 0), 0);
+    const gastoTotal = comp.reduce((s, e) => s + (e.total || 0), 0);
+    return { consumoMedio, ultimoConsumo, custoKmMedio, gastoMes, litrosMes, precoMedioMes, kmMes, gastoTotal, nAbast: comp.length, nMes: doMes.length };
+  }
+
   // ---------- Exportar / importar ----------
   function exportJSON() { return JSON.stringify(state, null, 2); }
   function importJSON(txt) {
@@ -472,6 +534,7 @@ const Store = (() => {
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
+    fuelEntries, fuelEntriesComputed, fuelStats, addFuel, updateFuel, removeFuel,
     exportJSON, importJSON, resetAll
   };
 })();
