@@ -243,6 +243,17 @@ table.fluxo { border-collapse: collapse; font-size: 12.5px; min-width: 1080px; }
 .hbar-fill { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
 .hbar-value { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Composição da carteira (dashboard): valor + % à direita, mais espaço que a barra de despesas */
+#comp-carteira .hbar-row { grid-template-columns: 78px 1fr max-content; }
+#comp-carteira .hbar-value { white-space: nowrap; }
+#comp-carteira .comp-total { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
+#comp-carteira .comp-total .hbar-track { background: none; }
+
+/* Resumo da carteira (dashboard): linhas rótulo → valor */
+.inv-resumo { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.inv-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
+.inv-linha + .inv-linha { padding-top: 8px; border-top: 1px solid var(--border); }
+
 .budget-track { display: block; background: color-mix(in srgb, var(--grid) 55%, transparent); border-radius: 4px; height: 12px; overflow: hidden; }
 .budget-fill { display: block; height: 100%; border-radius: 0 4px 4px 0; }
 .budget-fill.good { background: var(--good); }

@@ -82,14 +82,26 @@ const ViewDashboard = (() => {
       .sort((a, b) => b.total - a.total);
     const totalFat = cartoes.reduce((s, c) => s + c.total, 0);
 
-    // Gastos por categoria (o cartão usa a fatura vigente, igual à despesa do mês)
-    const porCat = Store.despesasPorCategoria(ymAtual);
-    const itemCartao = st.flowItems.find(i => i.autoCartao);
-    if (itemCartao && gastoCartao) porCat[itemCartao.categoryId] = gastoCartao;
-    const rows = Object.entries(porCat)
-      .map(([cat, v]) => ({ label: Store.catName(cat), value: v }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+    // Composição da carteira: valor atual em Ações, FIIs e Renda fixa.
+    // Ações/FIIs usam a cotação (mesma base do Patrimônio investido); renda fixa é o valor informado.
+    let vAcoes = 0, vFiis = 0;
+    const invQuotes = Store.inv().quotes;
+    for (const a of Store.inv().assets) {
+      const q = invQuotes[a.ticker];
+      if (!q) continue;
+      const val = q.price * a.qty;
+      if (a.type === "fii") vFiis += val; else vAcoes += val;
+    }
+    const vRF = Store.rfTotal();
+    const totalInv = vAcoes + vFiis + vRF;
+    const comp = [
+      { label: "Ações", value: vAcoes },
+      { label: "FIIs", value: vFiis },
+      { label: "Renda fixa", value: vRF }
+    ].filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+    const aportes = Store.aportesDoAno(ano);
+    const rent = Store.carteiraRentabilidade();
+    const nAtivos = Store.inv().assets.length;
 
     root.innerHTML = `
       <div class="page-head">
@@ -130,17 +142,6 @@ const ViewDashboard = (() => {
           <div class="stat-value num ${U.clsValor(saldoDez)}">${U.brl(saldoDez)}</div>
           <div class="stat-sub">${conta ? "a partir do saldo em conta" : "projeção do fluxo anual"}</div>
         </div>
-        <div class="card stat clickable" data-goto="investimentos">
-          <div class="stat-label">📈 Patrimônio investido</div>
-          <div class="stat-value num">${patrimonio > 0 ? U.brl(patrimonio) : "—"}</div>
-          <div class="stat-sub">${(() => {
-            const r = Store.carteiraRentabilidade();
-            if (!r) return "ações, FIIs e renda fixa";
-            const cls = r.ganho > 0 ? "pos" : r.ganho < 0 ? "neg" : "muted";
-            const sinal = r.ganho >= 0 ? "+" : "";
-            return `<span class="${cls} num">${sinal}${U.brl(r.ganho)} · ${sinal}${r.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span> <span class="muted">rentab. ações/FIIs</span>`;
-          })()}</div>
-        </div>
       </div>
 
       ${cartoes.length ? `
@@ -173,9 +174,35 @@ const ViewDashboard = (() => {
         </div>
       </div>
 
-      <div class="card mt">
-        <h2 class="section">Despesas por categoria — ${U.MESES[mes - 1]}</h2>
-        <div id="chart-cat"></div>
+      <div class="grid-2 mt">
+        <div class="card clickable" data-goto="investimentos">
+          <h2 class="section">📈 Carteira de investimentos</h2>
+          <div class="stat-value num">${patrimonio > 0 ? U.brl(patrimonio) : "—"}</div>
+          <div class="stat-sub">patrimônio investido (ações, FIIs e renda fixa)</div>
+          <div class="inv-resumo">
+            <div class="inv-linha">
+              <span class="muted">Rentabilidade ações/FIIs</span>
+              <span>${(() => {
+                if (!rent) return `<span class="muted">—</span>`;
+                const cls = rent.ganho > 0 ? "pos" : rent.ganho < 0 ? "neg" : "muted";
+                const sinal = rent.ganho >= 0 ? "+" : "";
+                return `<span class="${cls} num">${sinal}${U.brl(rent.ganho)} · ${sinal}${rent.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>`;
+              })()}</span>
+            </div>
+            <div class="inv-linha">
+              <span class="muted">Aportes em ${ano}</span>
+              <span class="num">${aportes > 0 ? U.brl(aportes) : "—"}</span>
+            </div>
+            <div class="inv-linha">
+              <span class="muted">Ativos na carteira</span>
+              <span class="num">${nAtivos || "—"}</span>
+            </div>
+          </div>
+        </div>
+        <div class="card clickable" data-goto="investimentos">
+          <h2 class="section">Composição da carteira</h2>
+          <div id="comp-carteira"></div>
+        </div>
       </div>`;
 
     // Quadros/linhas clicáveis: leva para a aba referente
@@ -231,7 +258,31 @@ const ViewDashboard = (() => {
     });
 
     Charts.saldoChart(root.querySelector("#chart-saldo"), serie);
-    Charts.barsH(root.querySelector("#chart-cat"), rows);
+
+    // Composição da carteira: barra = fatia do total; mostra R$ e %
+    const compEl = root.querySelector("#comp-carteira");
+    if (!comp.length || totalInv <= 0) {
+      compEl.innerHTML = `<p class="empty">Sem investimentos cadastrados. Adicione ativos ou renda fixa na aba <b>Investimentos</b>.</p>`;
+    } else {
+      const wrap = U.el(`<div class="hbars"></div>`);
+      for (const c of comp) {
+        const pct = (c.value / totalInv) * 100;
+        const pctTxt = pct.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+        wrap.appendChild(U.el(`
+          <div class="hbar-row" title="${U.esc(c.label)}: ${U.brl(c.value)} (${pctTxt}%)">
+            <span class="hbar-label">${U.esc(c.label)}</span>
+            <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%"></span></span>
+            <span class="hbar-value">${U.brl(c.value)} <span class="muted">· ${pctTxt}%</span></span>
+          </div>`));
+      }
+      wrap.appendChild(U.el(`
+        <div class="hbar-row comp-total">
+          <span class="hbar-label"><b>Total</b></span>
+          <span></span>
+          <span class="hbar-value"><b>${U.brl(totalInv)}</b></span>
+        </div>`));
+      compEl.appendChild(wrap);
+    }
 
     // Próximos vencimentos agrupados por mês, com total e expansão ao clicar no mês
     const vencEl = root.querySelector("#dash-venc");
