@@ -21,7 +21,13 @@ const ViewCombustivel = (() => {
   function abrirForm(entry) {
     const e = entry || {};
     const tipoOpts = TIPOS.map(([v, l]) => `<option value="${v}" ${e.fuelType === v ? "selected" : ""}>${l}</option>`).join("");
-    UI.modal(entry ? "Editar abastecimento" : "Novo abastecimento", `
+    const cartoes = Store.state.accounts.filter(a => a.type === "cartao");
+    const linked = (e.linkCardTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkCardTxId) : null;
+    const faturaDefault = linked ? linked.ym : U.ymAdd((e.date || U.hojeISO()).slice(0, 7), 1);
+    const cartaoOpts = cartoes.map(a => `<option value="${a.id}" ${e.cardId === a.id ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
+    const ehCartao = e.payment === "cartao";
+
+    const ov = UI.modal(entry ? "Editar abastecimento" : "Novo abastecimento", `
       <div class="fld-2">
         <label class="fld"><span>Data</span><input type="date" name="date" value="${e.date || U.hojeISO()}" required></label>
         <label class="fld"><span>Hodômetro (km)</span><input type="text" name="odometer" inputmode="decimal" value="${e.odometer != null ? e.odometer : ""}" placeholder="ex: 50000"></label>
@@ -37,6 +43,20 @@ const ViewCombustivel = (() => {
       <div class="fld-2">
         <label class="fld"><span>Local</span><input type="text" name="local" value="${U.esc(e.local || "")}" placeholder="ex: cidade / posto"></label>
         <label class="fld"><span>Pedágio (R$)</span><input type="text" name="toll" inputmode="decimal" value="${e.toll ? e.toll : ""}" placeholder="ex: 0"></label>
+      </div>
+      <label class="fld"><span>Forma de pagamento</span>
+        <select name="forma" id="comb-forma">
+          <option value="" ${ehCartao ? "" : "selected"}>— não lançar no financeiro —</option>
+          <option value="cartao" ${ehCartao ? "selected" : ""}>💳 Cartão de crédito</option>
+        </select></label>
+      <div id="comb-cartao-box" style="display:${ehCartao ? "block" : "none"}">
+        ${cartoes.length ? `
+        <div class="fld-2">
+          <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartaoOpts}</select></label>
+          <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${faturaDefault}"></label>
+        </div>
+        <p class="muted" style="font-size:12px">O valor do combustível entra na <b>fatura do cartão</b> (tela Cartões + Fluxo Anual). Editar/excluir este abastecimento atualiza a compra lá.</p>`
+        : `<p class="muted" style="font-size:12px">Nenhum cartão cadastrado. Cadastre um em <b>Financeiro → Cartões</b> para usar esta opção.</p>`}
       </div>
       <label class="fld"><span>Observação</span><input type="text" name="obs" value="${U.esc(e.obs || "")}" placeholder="ex: Completou tanque"></label>
       <label class="fld fld-check"><input type="checkbox" name="full" ${e.full === false ? "" : "checked"}><span>Tanque cheio (usar no cálculo de consumo)</span></label>
@@ -59,12 +79,37 @@ const ViewCombustivel = (() => {
         local: form.local.value.trim(),
         toll: num(form.toll.value) || 0,
         obs: form.obs.value.trim(),
-        full: form.full.checked
+        full: form.full.checked,
+        payment: null, cardId: null, linkCardTxId: null
       };
+
+      // Sincroniza com o financeiro: remove o vínculo antigo e (re)cria conforme a forma escolhida.
+      if (entry && entry.linkCardTxId) Store.removeCardTx(entry.linkCardTxId);
+      const forma = form.forma ? form.forma.value : "";
+      const cardId = form.cartao ? form.cartao.value : "";
+      if (forma === "cartao" && temAbast && total != null && cardId) {
+        const txId = U.id();
+        const descLocal = dados.local ? " - " + dados.local : "";
+        Store.addCardTx({
+          id: txId,
+          ym: (form.fatura && form.fatura.value) || U.ymAdd(dados.date.slice(0, 7), 1),
+          accountId: cardId,
+          desc: "Combustível" + descLocal,
+          value: Math.abs(total),
+          date: dados.date
+        });
+        dados.payment = "cartao"; dados.cardId = cardId; dados.linkCardTxId = txId;
+      }
+
       if (entry) Store.updateFuel(entry.id, dados);
       else Store.addFuel(dados);
       App.render();
     });
+
+    // Mostra/esconde o seletor de cartão conforme a forma de pagamento
+    const formaSel = ov.querySelector("#comb-forma");
+    const cardBox = ov.querySelector("#comb-cartao-box");
+    if (formaSel && cardBox) formaSel.addEventListener("change", () => { cardBox.style.display = formaSel.value === "cartao" ? "block" : "none"; });
   }
 
   // Importar histórico colado em JSON (roda no navegador do usuário; nada sai do aparelho).
@@ -321,7 +366,7 @@ const ViewAbastecimentos = (() => {
       const tr = U.el(`
         <tr${temAbast ? "" : ' class="linha-pedagio"'}>
           <td>${U.dataBR(e.date)}${e.local ? `<div class="muted" style="font-size:11px">${U.esc(e.local)}</div>` : ""}${e.obs ? `<div class="muted" style="font-size:10.5px;font-style:italic">${U.esc(e.obs)}</div>` : ""}</td>
-          <td>${e.fuelType ? ViewCombustivel.tipoLabel(e.fuelType) : '<span class="muted">— só pedágio</span>'}</td>
+          <td>${e.fuelType ? ViewCombustivel.tipoLabel(e.fuelType) : '<span class="muted">— só pedágio</span>'}${e.payment === "cartao" ? ' <span title="Pago no cartão" style="font-size:11px">💳</span>' : ""}</td>
           <td class="num">${e.odometer != null ? e.odometer.toLocaleString("pt-BR") : "—"}</td>
           <td class="num">${e.dist != null ? e.dist.toLocaleString("pt-BR") : "—"}</td>
           <td class="num">${temAbast ? e.liters.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "—"}</td>
@@ -336,7 +381,9 @@ const ViewAbastecimentos = (() => {
         </tr>`);
       tr.querySelector(".ed").addEventListener("click", () => ViewCombustivel.abrirForm(e));
       tr.querySelector(".rm").addEventListener("click", () => {
-        UI.confirmar(`Excluir o registro de ${U.dataBR(e.date)}?`, () => {
+        const aviso = e.linkCardTxId ? " A compra vinculada também sairá da fatura do cartão." : "";
+        UI.confirmar(`Excluir o registro de ${U.dataBR(e.date)}?${aviso}`, () => {
+          if (e.linkCardTxId) Store.removeCardTx(e.linkCardTxId);
           Store.removeFuel(e.id);
           App.render();
         });

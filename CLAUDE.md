@@ -135,6 +135,15 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     combustível, dos intervalos válidos) — ou o consumo do perfil, senão fallback 11 / 17,4. Custo/km =
     preço ÷ consumo; **ponto de virada** = `precoGasolina × (consumoAlcool / consumoGasolina)`. Pré-preenche
     com `Store.fuelUltimoPreco(fuel)`.
+  - **Dashboard (1ª aba)**: além dos KPIs, tem o card **Previsão para <próximo mês>** (`Store.fuelPrevisaoProxMes`:
+    combustível = ritmo km/dia ÷ consumo médio × preço recente do litro; pedágio = média dos meses fechados,
+    descartando o 1º se for parcial) e o gráfico **Gasto por mês** (`Store.fuelGastoPorMes` via `Charts.barsH`,
+    com a barra da previsão).
+  - **Pagamento no cartão** (integração com o Financeiro): o form de abastecimento tem **Forma de pagamento**
+    (— não lançar — / 💳 Cartão). No cartão, cria um `cardTx` (fatura = mês do abastecimento **+ 1**) e vincula
+    por `entry.linkCardTxId` (+ `payment: "cartao"`, `cardId`). **Editar** o abastecimento remove o `cardTx`
+    antigo e recria; **excluir** remove o `cardTx`. A **importação NÃO cria** lançamentos (é histórico) e o
+    **pedágio fica de fora** da integração. Só cartão por enquanto (pix/dinheiro não foram pedidos).
 
 ## Convenções de UI
 
