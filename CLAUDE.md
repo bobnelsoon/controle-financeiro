@@ -34,8 +34,9 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/ui.js` — `UI`: modal genérico, confirmação, selects.
 - `js/views/*.js` — uma view por aba (`ViewDashboard`, `ViewFluxo`, `ViewLancamentos`, `ViewCartoes`,
   `ViewEmprestimos`, `ViewInvestimentos`, `ViewOrcamento`, `ViewCombustivel`, `ViewAbastecimentos`,
-  `ViewConfig`), cada uma com `render(root)`. `combustivel.js` exporta **duas** views (`ViewCombustivel` =
-  Resumo, `ViewAbastecimentos` = lista) + o form compartilhado `ViewCombustivel.abrirForm(entry)`.
+  `ViewVeiculo`, `ViewConfig`), cada uma com `render(root)`. `combustivel.js` exporta **três** views
+  (`ViewCombustivel` = Resumo, `ViewAbastecimentos` = lista, `ViewVeiculo` = perfil/revisão/manutenção) +
+  o form compartilhado `ViewCombustivel.abrirForm(entry)` e `ViewCombustivel.abrirImportar()`.
 - `js/app.js` — `App`: roteador por hash com **múltiplos controles**. `App.controles` mapeia cada controle
   (`financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. `boot()` monta o seletor de controles
   na `.brand`, a nav do controle ativo, e `App.trocarControle(id)` troca o controle inteiro. As rotas por
@@ -123,7 +124,17 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): cola JSON
   (`date, km, fuel, local, liters, price, paid, toll, obs`), `Store.addFuelMany`/`clearFuel`. Import marca como
   **parcial** o que a obs indica (parcial/mínimo/reforço) **ou** dois abastecimentos no mesmo hodômetro (não
-  fecham tanque). **Nunca versionar dados reais do usuário** — a importação roda só no navegador dele.
+  fecham tanque). **Nunca versionar dados reais do usuário** — a importação roda só no navegador dele
+  (nem placeholders de exemplo no código podem conter dados reais do usuário).
+  - **Aba Veículo** (`ViewVeiculo`): `state.fuel.vehicle` = `{ modelo, tanque, pneu, revisaoKm, consumoAlcool,
+    consumoGasolina }` (init idempotente no `migrate`, sem bump de versão) e `state.fuel.maintenance` =
+    `[{ id, desc, value, done }]`. **Km atual** = `Store.fuelKmAtual()` (maior hodômetro). **Contador de
+    revisão**: `revisaoKm − kmAtual` + previsão de data por `Store.fuelPaceKmDia()` (km/dia entre 1º e último
+    registro). **Manutenção**: total previsto e "ainda a pagar" (itens não `done`).
+  - **Comparador álcool/gasolina** (card no Resumo): usa `Store.fuelConsumoPorFuel()` (consumo real por
+    combustível, dos intervalos válidos) — ou o consumo do perfil, senão fallback 11 / 17,4. Custo/km =
+    preço ÷ consumo; **ponto de virada** = `precoGasolina × (consumoAlcool / consumoGasolina)`. Pré-preenche
+    com `Store.fuelUltimoPreco(fuel)`.
 
 ## Convenções de UI
 
@@ -158,17 +169,27 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Trabalhando na `v19` / cache `202607191600`: o app virou **Gestão Pessoal** (guarda-chuva de controles) e
-ganhou o **controle de Combustível** (⛽). A última versão do controle Financeiro publicada foi a `v18`.
+Trabalhando na `v19` / cache `202607191600` — **na branch `claude/project-updates-2r7rf9`, AINDA NÃO
+PUBLICADO**. O usuário quer fazer mais melhorias no controle de Combustível **antes** de publicar na `main`
+(a última versão publicada continua sendo a `v18` do Financeiro). Quando ele disser "pode publicar", subir
+tudo pra `main` de uma vez (PR → merge). O app virou **Gestão Pessoal** (guarda-chuva de controles).
 
-Novidades da v19 (validadas em headless, prontas para publicar):
-- **Renomeado para "Gestão Pessoal"** + **seletor de Controles** na `.brand` (botão "Controles ▾" → menu
-  com 💰 Financeiro / ⛽ Combustível). Troca o controle inteiro (nav + view) e salva a escolha em
-  `localStorage`. Abre sempre na 1ª aba do controle ativo. Configurações aparece nos dois controles.
-- **Controle de Combustível** (`state.fuel.entries`, migração v6): abas **Resumo** (KPIs — consumo médio
-  km/l, último consumo, custo/km, gasto do mês, preço médio do litro, km rodados no mês — + últimos
-  abastecimentos) e **Abastecimentos** (lista com adicionar/editar/excluir). Consumo tanque a tanque
-  (`Store.fuelEntriesComputed` / `Store.fuelStats`). É uma **v1 para o usuário ir ajustando**.
+Feito na branch (validado em headless com os dados reais do usuário; **nada de dado real foi versionado**):
+- **Gestão Pessoal** + **seletor de Controles** na `.brand` (botão "Controles ▾" → 💰 Financeiro / ⛽
+  Combustível). Troca o controle inteiro (nav + view), salva a escolha em `localStorage`, abre na 1ª aba do
+  controle ativo. Configurações aparece nos dois.
+- **Controle de Combustível** (`state.fuel`, migração v6): abas **Resumo** (KPIs de consumo/custo + comparador
+  álcool×gasolina + últimos), **Abastecimentos** (lista completa + 📥 Importar JSON) e **Veículo** (perfil +
+  contador de revisão + manutenção programada). Consumo **tanque cheio → tanque cheio**; **pedágio separado**
+  (informativo). Ver a seção "Combustível (controle ⛽)" nas convenções de cálculo.
+- O usuário tem um **histórico real de combustível** (veículo flex, rota fixa entre duas cidades, transição
+  gasolina→álcool, dezenas de abastecimentos). Foi usado só para **validar localmente** (scratchpad da sessão,
+  não versionado); consumo real bate com os cálculos (álcool compensa no uso dele). **Os dados reais NUNCA vão
+  ao repositório** — vivem só no aparelho/Gist do usuário. Para revalidar, pedir o histórico de novo.
+
+Ideias que ficaram na mesa para o Combustível (usuário vai escolher): custo por viagem (trecho + pedágio),
+gráfico do preço do litro no tempo, KPI de consumo separado por combustível, alerta de revisão mais visível,
+metas/orçamento de combustível por mês.
 
 No ar (v18) e estável no controle Financeiro:
 - **Empréstimo simétrico ao fluxo**: marcar parcela como PAGO grava `settledAt` e o valor cai no
