@@ -37,10 +37,15 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   `ViewVeiculo`, `ViewConfig`), cada uma com `render(root)`. `combustivel.js` exporta **três** views
   (`ViewCombustivel` = Resumo, `ViewAbastecimentos` = lista, `ViewVeiculo` = perfil/revisão/manutenção) +
   o form compartilhado `ViewCombustivel.abrirForm(entry)` e `ViewCombustivel.abrirImportar()`.
+- `js/views/inicio.js` — a **tela inicial (lançador)** `ViewInicio` (botões Financeiro / Combustível /
+  Adicionar / Atualizar), o menu **`Adicionar.abrirMenu()`** (Compra no cartão / Compra parcelada /
+  Abastecimento / Recebido / Pago) e **`Marcar.abrir(kind)`** (marca um item FIXO do fluxo como
+  RECEBIDO/receita ou PAGO/despesa via `Store.setCell`, atualizando saldo/fluxo/dashboard).
 - `js/app.js` — `App`: roteador por hash com **múltiplos controles**. `App.controles` mapeia cada controle
-  (`financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. `boot()` monta o seletor de controles
-  na `.brand`, a nav do controle ativo, e `App.trocarControle(id)` troca o controle inteiro. As rotas por
-  hash (`#dashboard`, `#combustivel`, `#abastecimentos`, ...) são resolvidas dentro do controle ativo.
+  (`inicio`, `financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. O controle `inicio` é a tela
+  lançadora (sem abas — a nav fica vazia). `boot()` monta o seletor de controles + o botão **➕ Adicionar**
+  na `.brand`, e **abre sempre na tela inicial** (`#inicio`). `App.trocarControle(id)` troca o controle
+  inteiro. Rotas por hash (`#inicio`, `#dashboard`, `#combustivel`, ...) resolvidas no controle ativo.
 
 Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render()`.
 
@@ -147,11 +152,14 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 ## Convenções de UI
 
-- **Sempre abre na 1ª aba do controle ativo**: `App.boot` força `#<inicio>` do controle salvo via
-  `history.replaceState` (Financeiro → `#dashboard`; Combustível → `#combustivel`), ignorando a última aba
-  salva no hash da URL ao reabrir.
-- **Seletor de controles** (`.brand`): botão "Controles ▾" abre `.ctrl-menu` (dropdown) com os controles;
-  o ativo recebe `.ativo`. Fecha ao clicar fora. No mobile a `.brand` vira linha (nome + botão) na barra do topo.
+- **Abre sempre na tela inicial (lançador)**: `App.boot` força `controleAtivo = "inicio"` e `#inicio`
+  (decisão do usuário). De lá o usuário entra num controle (`trocarControle` → 1ª aba dele) ou usa Adicionar.
+- **Seletor de controles + Adicionar** (`.brand`): botão "Controles ▾" abre `.ctrl-menu` (🏠 Início /
+  💰 Financeiro / ⛽ Combustível; o ativo recebe `.ativo`) e o botão **➕ Adicionar** (`Adicionar.abrirMenu`)
+  fica logo abaixo, disponível em qualquer tela. Fecha ao clicar fora. No mobile a `.brand` vira linha.
+- **Integração pelo Adicionar**: um lançamento atualiza os dois controles — Compra → `ViewCartoes.abrirNovaCompra`
+  (cartão + parcelas); Abastecimento → `ViewCombustivel.abrirForm` (pode cair no cartão); Recebido/Pago →
+  `Marcar.abrir` marca item fixo do fluxo (setCell com status), mexendo no saldo/fluxo/dashboard.
 - Tabelas largas rolam dentro do `.card` no mobile (media query ≤700px); tabela de investimentos usa `.tbl-wide`.
 - Quadros/linhas com `data-goto` navegam para a aba (`.clickable[data-goto]` no dashboard).
 - Estilo por tokens CSS em `:root` (tema claro/escuro via `prefers-color-scheme`).
@@ -184,9 +192,12 @@ PUBLICADO**. O usuário quer fazer mais melhorias no controle de Combustível **
 tudo pra `main` de uma vez (PR → merge). O app virou **Gestão Pessoal** (guarda-chuva de controles).
 
 Feito na branch (validado em headless com os dados reais do usuário; **nada de dado real foi versionado**):
-- **Gestão Pessoal** + **seletor de Controles** na `.brand` (botão "Controles ▾" → 💰 Financeiro / ⛽
-  Combustível). Troca o controle inteiro (nav + view), salva a escolha em `localStorage`, abre na 1ª aba do
-  controle ativo. Configurações aparece nos dois.
+- **Tela inicial (lançador)** `ViewInicio`: o app **abre sempre nela** com 4 botões — Financeiro, Combustível,
+  ➕ Adicionar, 🔄 Atualizar. O botão **➕ Adicionar** também fica na `.brand` (sempre acessível) e abre o menu
+  Compra / Compra parcelada / Abastecimento / Recebido / Pago, integrando os dois controles (ver convenções).
+- **Gestão Pessoal** + **seletor de Controles** na `.brand` (botão "Controles ▾" → 🏠 Início / 💰 Financeiro /
+  ⛽ Combustível). Troca o controle inteiro (nav + view), salva a escolha em `localStorage`. Configurações
+  aparece nos dois controles.
 - **Controle de Combustível** (`state.fuel`, migração v6): abas **Resumo** (KPIs de consumo/custo + comparador
   álcool×gasolina + últimos), **Abastecimentos** (lista completa + 📥 Importar JSON) e **Veículo** (perfil +
   contador de revisão + manutenção programada). Consumo **tanque cheio → tanque cheio**; **pedágio separado**

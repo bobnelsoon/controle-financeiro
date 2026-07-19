@@ -7,6 +7,10 @@ const App = (() => {
   const rotaConfig = { titulo: "Configurações", icone: "⚙️", view: () => ViewConfig };
 
   const controles = {
+    inicio: {
+      nome: "Início", icone: "🏠", inicio: "inicio",
+      rotas: { inicio: { titulo: "Início", icone: "🏠", view: () => ViewInicio } }
+    },
     financeiro: {
       nome: "Financeiro", icone: "💰", inicio: "dashboard",
       rotas: {
@@ -51,8 +55,11 @@ const App = (() => {
   function montarNav() {
     const nav = document.querySelector(".nav");
     nav.innerHTML = "";
-    for (const [key, r] of Object.entries(ctrl().rotas)) {
-      nav.appendChild(U.el(`<a href="#${key}" data-rota="${key}"><span class="icon">${r.icone}</span>${r.titulo}</a>`));
+    // A tela inicial não mostra abas (é só o lançador).
+    if (controleAtivo !== "inicio") {
+      for (const [key, r] of Object.entries(ctrl().rotas)) {
+        nav.appendChild(U.el(`<a href="#${key}" data-rota="${key}"><span class="icon">${r.icone}</span>${r.titulo}</a>`));
+      }
     }
     // Marca o controle ativo no menu de controles
     document.querySelectorAll(".ctrl-menu [data-ctrl]").forEach(b =>
@@ -84,13 +91,17 @@ const App = (() => {
           ${Object.entries(controles).map(([id, c]) =>
             `<button type="button" data-ctrl="${id}">${c.icone} ${c.nome}</button>`).join("")}
         </div>
-      </div>`;
+      </div>
+      <button class="add-btn" id="btn-adicionar">➕ Adicionar</button>`;
 
     const btn = brand.querySelector("#btn-controles");
     const menu = brand.querySelector("#ctrl-menu");
     btn.addEventListener("click", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; });
     menu.querySelectorAll("[data-ctrl]").forEach(b =>
       b.addEventListener("click", () => trocarControle(b.dataset.ctrl)));
+    brand.querySelector("#btn-adicionar").addEventListener("click", () => {
+      if (typeof Adicionar !== "undefined") Adicionar.abrirMenu();
+    });
     // fecha ao clicar fora
     document.addEventListener("click", (e) => {
       if (menu && !menu.hidden && !brand.contains(e.target)) menu.hidden = true;
@@ -99,14 +110,13 @@ const App = (() => {
 
   function boot() {
     Store.load();
-    controleAtivo = localStorage.getItem(CTRL_KEY);
-    if (!controles[controleAtivo]) controleAtivo = "financeiro";
+    // Abre sempre na tela inicial (lançador), conforme escolhido pelo usuário.
+    controleAtivo = "inicio";
 
     montarSeletorControles();
     montarNav();
     window.addEventListener("hashchange", render);
-    // Sempre inicia na primeira aba do controle ativo (ignora a última aba salva no hash da URL).
-    history.replaceState(null, "", "#" + ctrl().inicio);
+    history.replaceState(null, "", "#inicio");
     render();
     Sync.init(); // baixa alterações feitas em outro aparelho (se a sincronização estiver ativa)
   }

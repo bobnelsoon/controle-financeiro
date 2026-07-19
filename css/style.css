@@ -85,6 +85,39 @@ body {
 }
 .ctrl-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ctrl-menu button.ativo { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-weight: 600; }
+
+/* Botão "Adicionar" (global, na marca) */
+.add-btn {
+  width: 100%; margin-top: 2px; padding: 7px 10px; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  font-weight: 600; font-size: 12.5px; cursor: pointer;
+}
+.add-btn:hover { filter: brightness(1.08); }
+
+/* Menu Adicionar (lista de opções no modal) */
+.add-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.add-opts button {
+  text-align: left; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer;
+}
+.add-opts button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* Tela inicial (lançador) */
+.inicio { max-width: 640px; margin: 3vh auto 0; }
+.inicio-head { text-align: center; margin-bottom: 22px; }
+.inicio-head h1 { font-size: 26px; margin: 0 0 4px; }
+.inicio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.inicio-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 26px 14px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); cursor: pointer; font-size: 15px; font-weight: 600;
+  color: var(--ink); text-align: center; line-height: 1.25;
+}
+.inicio-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.inicio-btn .ib-ic { font-size: 30px; }
+.inicio-btn small { font-weight: 400; color: var(--muted); font-size: 11px; }
+.inicio-btn.destaque { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+@media (max-width: 560px) { .inicio-grid { grid-template-columns: 1fr; } }
 .nav a {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 10px; border-radius: 8px;
