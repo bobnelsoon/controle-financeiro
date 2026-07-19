@@ -34,6 +34,8 @@ const ViewDashboard = (() => {
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
+    // Disponível no mês = o que já está na conta + o que ainda entra de receita neste mês.
+    const disponivelMes = saldoConta != null ? Math.round((saldoConta + receitas) * 100) / 100 : null;
     // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
     const pProx = serie.find(p => p.ym === ymFatura);
     const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
@@ -117,10 +119,16 @@ const ViewDashboard = (() => {
           <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
           <div class="stat-sub">${conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar"}</div>
         </div>
-        <div class="card stat clickable" data-goto="fluxo">
+        <div class="card stat stat-duplo clickable" data-goto="fluxo">
           <div class="stat-label">Receitas do mês</div>
           <div class="stat-value pos num">${U.brl(receitas)}</div>
           <div class="stat-sub">fixas + lançamentos</div>
+          ${disponivelMes != null ? `
+          <div class="stat-linha2">
+            <div class="stat-label">Disponível no mês</div>
+            <div class="stat-value num ${U.clsValor(disponivelMes)}">${U.brl(disponivelMes)}</div>
+            <div class="stat-sub">saldo em conta + receitas do mês</div>
+          </div>` : ""}
         </div>
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Despesas do mês</div>
