@@ -123,6 +123,7 @@ const ViewDashboard = (() => {
           <div class="stat-label">💰 Saldo em conta <button class="btn-sm" id="btn-edit-conta" title="Atualizar saldo">✎</button></div>
           <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
           <div class="stat-sub">${conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar"}</div>
+          <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
         </div>
         <div class="card stat stat-duplo clickable" data-goto="fluxo">
           <div class="stat-label">Receitas do mês</div>
@@ -250,6 +251,11 @@ const ViewDashboard = (() => {
         App.render();
         if (avisos.length) alert("Atualizado com avisos:\n• " + avisos.join("\n• "));
       }
+    });
+
+    root.querySelector("#btn-compra-cartao").addEventListener("click", (e) => {
+      e.stopPropagation();
+      ViewCartoes.abrirNovaCompra(null); // mesma tela da aba Cartões; ao salvar, re-renderiza o dashboard
     });
 
     root.querySelector("#btn-edit-conta").addEventListener("click", (e) => {

@@ -158,5 +158,5 @@ const ViewCartoes = (() => {
     if (!algum && !st.accounts.length) list.innerHTML = `<div class="card"><p class="empty">Nenhum cartão cadastrado.</p></div>`;
   }
 
-  return { render };
+  return { render, abrirNovaCompra };
 })();
