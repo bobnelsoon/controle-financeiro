@@ -34,6 +34,8 @@ const App = (() => {
       nav.appendChild(U.el(`<a href="#${key}" data-rota="${key}"><span class="icon">${r.icone}</span>${r.titulo}</a>`));
     }
     window.addEventListener("hashchange", render);
+    // Sempre inicia no Dashboard, ignorando a última aba aberta (o hash fica salvo na URL ao reabrir).
+    if (location.hash !== "#dashboard") history.replaceState(null, "", "#dashboard");
     render();
     Sync.init(); // baixa alterações feitas em outro aparelho (se a sincronização estiver ativa)
   }

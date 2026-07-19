@@ -56,21 +56,27 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (com `createdAt`). É recalculado a cada render (seguro para a sincronização). Reinformar o saldo
   recalibra a âncora (`at = agora`). Compras no cartão NÃO mexem no saldo até a fatura ser paga.
 
-- **Resultado do mês — FONTE ÚNICA `Store.resultadoMes(ym)`** (usada pelo Dashboard **e** pelo Fluxo
-  Anual, para as duas telas sempre baterem): receitas − despesas em **valores cheios** (ignora status
-  Pago/Recebido, usa `plannedValue`). Inclui itens fixos do fluxo + lançamentos avulsos do mês +
-  **gasto do cartão do mês** (fatura vigente = `faturaTotal(ymAdd(ym,1))`, porque a compra do mês vira
-  fatura no mês seguinte). O item automático `autoCartao` ("Cartão (fatura)") é **ignorado** para não
-  contar a fatura em dobro. O gráfico "Despesas por categoria" usa a mesma base. **Não alinhar o
-  Resultado ao Acumulado por soma** — são métricas diferentes (ver abaixo).
+- **Resultado do mês — FONTE ÚNICA `Store.monthTotal(ym)`** (usada pelo Dashboard **e** pelo Fluxo
+  Anual, para as duas telas baterem): Σ `projectedValue` dos itens do fluxo (itens Pago/Recebido contam
+  **0**, então mês todo quitado → Resultado 0). No **Dashboard**, os quadros **Resultado** e **Acumulado**
+  olham para o **PRÓXIMO mês** (`ymFatura = ymAdd(ymHoje,1)`), porque o mês atual costuma já estar
+  quitado (Resultado 0) e a compra do cartão do mês só vira fatura no mês seguinte — assim os números
+  acompanham as Despesas/Cartão, que também mostram a fatura vigente. Os cards **Receitas/Despesas do
+  mês** do topo continuam informativos do **mês atual** em valores cheios (`plannedValue` + avulsos +
+  `faturaTotal(ymFatura)` como despesa). ⚠️ A função antiga `Store.resultadoMes` (valores cheios +
+  fatura) foi **removida**; não recriar.
 
-- **Acumulado do mês (Dashboard) = saldo previsto na conta no FIM do mês**, não `saldo + resultado`.
-  É `saldoProjecaoSerie()[0].saldo`: parte do `saldoContaAtual` e soma **só o que ainda falta** (itens
-  já Pagos/Recebidos contam 0, pois já estão embutidos no saldo). **Decisão importante:** a fórmula
-  antiga `saldo em conta + resultado do mês` contava em dobro os itens já quitados (o dinheiro deles já
-  está no saldo). Com o mês todo quitado, o Acumulado passa a ser **igual ao próprio saldo em conta**
-  (ex.: usuário com Julho todo pago → Acumulado = saldo = R$ 7.900). "Resultado do mês" e "Acumulado"
-  medem coisas diferentes e **não** se somam ("como foi o mês" vs "quanto vou ter na conta").
+- **Acumulado (Dashboard) = saldo previsto na conta no FIM do PRÓXIMO mês**, não `saldo + resultado`.
+  É `saldoProjecaoSerie().find(p => p.ym === ymFatura).saldo`: parte do `saldoContaAtual` e soma **só o
+  que ainda falta** (itens já Pagos/Recebidos contam 0, pois já estão embutidos no saldo). **Decisão
+  importante:** `saldo + resultado` contava em dobro os itens já quitados. Com o mês todo quitado, o
+  Acumulado tende ao próprio saldo. "Resultado" e "Acumulado" medem coisas diferentes e **não** se
+  somam ("como foi o mês" vs "quanto vou ter na conta").
+
+- **Compras parceladas no cartão**: cada parcela é um `cardTx` separado (um por mês, `desc` com sufixo
+  ` NN/MM`). Parcelas novas compartilham um `groupId`. Excluir uma parcela oferece **"Excluir todas as
+  N parcelas"** (remove de todos os meses) ou "Só esta"; `Store.cardTxParcelas(tx)` acha as irmãs por
+  `groupId` ou, no fallback (compras antigas sem groupId), pela descrição base + mesmo cartão.
 
 - **Projeção do saldo** (`Store.saldoProjecaoSerie`): começa no `saldoContaAtual` e projeta do mês atual
   até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0). Alimenta o
@@ -82,12 +88,24 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
   verde/vermelho) usam `avgPrice` vs cotação atual; ficam "—" enquanto o preço pago não é informado.
+  No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
+  (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
+  Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI
+  "Patrimônio investido" do topo foram removidos (`Store.despesasPorCategoria`/`catName` seguem no store,
+  sem uso no dashboard).
 
 ## Convenções de UI
 
+- **Sempre abre no Dashboard**: `App.boot` força `#dashboard` via `history.replaceState`, ignorando a
+  última aba salva no hash da URL ao reabrir.
 - Tabelas largas rolam dentro do `.card` no mobile (media query ≤700px); tabela de investimentos usa `.tbl-wide`.
 - Quadros/linhas com `data-goto` navegam para a aba (`.clickable[data-goto]` no dashboard).
 - Estilo por tokens CSS em `:root` (tema claro/escuro via `prefers-color-scheme`).
+- **Safe areas (iPhone com notch/Dynamic Island)**: `index.html` usa `viewport-fit=cover` + metas de web
+  app (add-to-home-screen) e `theme-color` claro/escuro. Menu do topo (`.sidebar`), conteúdo (`.main`) e
+  o `.overlay` do modal aplicam `env(safe-area-inset-*)` (com `max()`/`calc()` preservando o padding
+  base) para não ficarem sob a ilha nem a barra de gesto. Validado a 440×956 (iPhone 17 Pro Max): sem
+  overflow horizontal, cards em 2 colunas.
 
 ## Validação (recomendado antes de commitar mudanças de cálculo)
 
@@ -106,38 +124,34 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Versão publicada atual: `v8` / cache `202607190100`. PRs #1 a #5 já mesclados na `main`.
+Última versão **publicada na `main`**: `v10` / cache `202607191700` (PRs #1 a #9 mesclados).
 
-Já feito e no ar:
-- Dashboard: quadros clicáveis (`data-goto`), cartões em lista com total, próximos vencimentos por mês.
-- Saldo em conta automático (Pago/Recebido + lançamentos pix/débito).
-- Fatura do cartão sempre um mês à frente.
-- Investimentos com preço pago, ganho/perda e rentabilidade da carteira.
-- Quadros **Resultado do mês** e **Acumulado do mês** no dashboard; Fluxo e Dashboard usam a **fonte
-  única** `Store.resultadoMes` / `Store.saldoAcumuladoSerie`, então os números batem entre as telas.
-- Acumulado corrigido para não contar itens quitados em dobro (= saldo previsto no fim do mês).
+**Na branch `claude/project-updates-2r7rf9`, commitado e validado headless, aguardando publicar (PR +
+merge na `main`)** — o usuário adiou o publish nas últimas rodadas:
+- `v11` — Dashboard: removido "Despesas por categoria" e o KPI "Patrimônio investido" do topo; adicionada
+  a seção de investimentos (**Carteira de investimentos** + **Composição da carteira**).
+- `v12` — Safe areas p/ iPhone (Dynamic Island / notch): `viewport-fit=cover`, metas de web app,
+  `theme-color`, `env(safe-area-inset-*)` no menu/conteúdo/modal. Validado a 440×956.
+- `v13` — App sempre abre no Dashboard (`history.replaceState`); excluir compra parcelada com opção
+  **"Excluir todas as N parcelas"** (`groupId` nas novas + fallback por descrição nas antigas).
+
+**➡️ Próximo passo natural: publicar (abrir PR e mesclar na `main`) para v11–v13 irem ao ar.**
+
+Já no ar (v10) e estável:
+- Resultado/Acumulado do Dashboard olham o **próximo mês** (fonte única `Store.monthTotal` /
+  `saldoProjecaoSerie`; Fluxo e Dashboard batem). Botão **Limpar** no editor de célula do Fluxo (desfaz
+  Pago/Recebido). Acumulado não conta itens quitados em dobro.
+- Saldo em conta automático; fatura do cartão sempre um mês à frente; investimentos com preço pago,
+  ganho/perda e rentabilidade.
 
 Pontos de atenção conhecidos:
-- **Próximos vencimentos** juntam `flowItems` (com `dueDay`) **e** parcelas de `loans` — não há vínculo
-  entre eles. Se o usuário cadastrar a mesma coisa nos dois lugares, aparece duplicado (foi o caso do
-  "Carro Taiara" × "Taiara — parcela 28", resolvido pelo usuário apagando o item de fluxo). É dado do
-  usuário; o agente não acessa/edita (vive no localStorage/Gist).
+- **Próximos vencimentos** juntam `flowItems` (com `dueDay`) **e** parcelas de `loans` — sem vínculo
+  entre eles; cadastrar a mesma coisa nos dois lugares duplica (é dado do usuário; o agente não acessa).
+- **Cache do `index.html`**: o `index.html` não tem `?v=`, então o navegador/CDN pode servir um HTML em
+  cache apontando pros assets antigos → parece que "não subiu". Solução do usuário: recarregar forte ou
+  abrir com `?v=13` no fim da URL. Melhoria futura possível: fazer o HTML recarregar assets sozinho.
 
-- **PENDENTE — validar o Acumulado com os dados reais.** O usuário reportou que, mesmo abrindo o link
-  atualizado, o Acumulado de Julho não veio 7.900 como ele esperava. Diagnóstico em aberto (aguardando
-  print do Dashboard ou backup):
-  1. **Publicação está OK.** GitHub Pages publica da `main` (sem workflow próprio; runs "pages build and
-     deployment" com sucesso). O `index.html` **não tem `?v=`**, então o navegador/CDN pode servir um
-     `index.html` em cache que aponta pros arquivos antigos → parece que "não subiu". Solução do lado do
-     usuário: abrir com `?v=8` no fim da URL, recarregar forte, ou limpar dados do site (isso apaga o
-     localStorage — restaurar via Configurações → Sincronização/Importar). **Ideia de melhoria futura:**
-     fazer o `index.html` recarregar os assets sozinho / evitar esse cache do HTML.
-  2. **Ou o cálculo:** `Acumulado = saldoProjecaoSerie()[0]` só é igual ao saldo se **todos** os itens
-     de Julho estiverem Pago/Recebido (`monthTotal(Julho)=0`). Se sobrar item pendente em Julho no dado
-     real, o Acumulado projeta esse pendente e legitimamente difere do saldo. Confirmar com o backup.
-  - Como saber se a versão nova carregou: o subtítulo do quadro Acumulado deve ser
-    "saldo previsto na conta no fim do mês" (versão antiga dizia "saldo em conta + resultado do mês").
-
-Testes headless ficam em `scratchpad/` (build.mjs gera `preview-demo.html` com dados fake +
-`window.Store`; test*.mjs dirigem via Playwright servindo por `python3 -m http.server`). Nunca subir
-dados reais do usuário ao repo nem a artifacts públicos.
+Testes headless ficam no **scratchpad da sessão** (não versionado): `build.mjs` gera `preview-demo.html`
+com dados fake + `window.Store/App/U`; `test*.mjs` dirigem via Playwright servindo por
+`python3 -m http.server 8199` (Chromium em `/opt/pw-browsers/...`). `build.mjs` já inclui `<meta charset>`
+e `<meta viewport>` no preview. Nunca subir dados reais do usuário ao repo nem a artifacts públicos.
