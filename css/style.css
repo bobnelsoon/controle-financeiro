@@ -222,6 +222,8 @@ label.fld.fld-check input { width: auto; }
 label.fld.fld-check > span { margin-bottom: 0; font-weight: 500; }
 label.fld textarea { font-family: inherit; font-size: 12.5px; resize: vertical; }
 tr.linha-pedagio td { color: var(--muted); }
+.revbar { height: 8px; border-radius: 6px; background: var(--grid); overflow: hidden; }
+.revbar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
 .modal code { font-size: 11.5px; background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 1px 4px; border-radius: 4px; }
 
 /* ---------- Tabelas ---------- */

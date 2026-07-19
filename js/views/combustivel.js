@@ -126,6 +126,65 @@ const ViewCombustivel = (() => {
       el.addEventListener("click", () => { location.hash = "#" + el.dataset.goto; }));
   }
 
+  // Comparador "álcool ou gasolina compensa?" — usa o consumo real de cada combustível.
+  function consumosComparador() {
+    const cons = Store.fuelConsumoPorFuel();
+    const v = Store.fuelVehicle();
+    const cA = (v.consumoAlcool && v.consumoAlcool > 0) ? v.consumoAlcool : (cons.alcool || 11);
+    const cG = (v.consumoGasolina && v.consumoGasolina > 0) ? v.consumoGasolina : (cons.gasolina || 17.4);
+    return { cA, cG };
+  }
+  function comparadorHTML() {
+    const { cA, cG } = consumosComparador();
+    const pA = Store.fuelUltimoPreco("alcool");
+    const pG = Store.fuelUltimoPreco("gasolina");
+    return `
+      <div class="card">
+        <b style="font-size:15px">⛽ Álcool ou gasolina?</b>
+        <div class="muted" style="font-size:12px;margin:2px 0 10px">Consumo usado: álcool ${cA.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/l · gasolina ${cG.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/l</div>
+        <div class="fld-2">
+          <label class="fld"><span>Preço do álcool (R$/L)</span><input type="text" id="cmp-alc" inputmode="decimal" value="${pA != null ? pA : ""}" placeholder="ex: 3,59"></label>
+          <label class="fld"><span>Preço da gasolina (R$/L)</span><input type="text" id="cmp-gas" inputmode="decimal" value="${pG != null ? pG : ""}" placeholder="ex: 6,49"></label>
+        </div>
+        <div id="cmp-res" style="margin-top:4px"></div>
+      </div>`;
+  }
+  function ligarComparador(root) {
+    const alc = root.querySelector("#cmp-alc");
+    const gas = root.querySelector("#cmp-gas");
+    const res = root.querySelector("#cmp-res");
+    if (!alc || !gas || !res) return;
+    const { cA, cG } = consumosComparador();
+    function calc() {
+      const pa = num(alc.value), pg = num(gas.value);
+      if (pa == null || pg == null || pa <= 0 || pg <= 0) {
+        res.innerHTML = `<span class="muted" style="font-size:12.5px">Informe os dois preços para comparar.</span>`;
+        return;
+      }
+      const custoA = pa / cA, custoG = pg / cG;
+      const alcoolVale = custoA <= custoG;
+      const econ = Math.abs(custoA - custoG);
+      const breakeven = pg * (cA / cG); // preço de álcool no ponto de equilíbrio
+      const pct = (pa / pg) * 100;
+      res.innerHTML = `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="tag num">Álcool: <b>${U.brl(custoA)}/km</b></span>
+          <span class="tag num">Gasolina: <b>${U.brl(custoG)}/km</b></span>
+        </div>
+        <div style="font-size:15px;font-weight:700" class="${alcoolVale ? "pos" : "neg"}">
+          ${alcoolVale ? "✅ Compensa ÁLCOOL" : "✅ Compensa GASOLINA"}
+          <span style="font-weight:500;font-size:12.5px" class="muted">(economia ${U.brl(econ)}/km)</span>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:6px">
+          Hoje o álcool está a ${pct.toLocaleString("pt-BR",{maximumFractionDigits:0})}% do preço da gasolina.
+          Ponto de virada: álcool vale até <b>${U.brl(breakeven)}/L</b> (${(cA / cG * 100).toLocaleString("pt-BR",{maximumFractionDigits:0})}% da gasolina).
+        </div>`;
+    }
+    alc.addEventListener("input", calc);
+    gas.addEventListener("input", calc);
+    calc();
+  }
+
   function render(root) {
     const s = Store.fuelStats();
     const { m, y } = U.ymParse(U.ymHoje());
@@ -148,16 +207,20 @@ const ViewCombustivel = (() => {
         ${statCard("Km rodados no mês", km(s.kmMes), "entre os registros do mês", "abastecimentos")}
         ${statCard("🛣️ Pedágio do mês", U.brl(s.tollMes), `total pago: ${U.brl(s.tollTotal)}`, "abastecimentos")}
       </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <b style="font-size:15px">Últimos abastecimentos</b>
-          <a href="#abastecimentos" class="muted" style="font-size:12.5px">ver todos →</a>
+      <div class="grid-2">
+        ${comparadorHTML()}
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <b style="font-size:15px">Últimos abastecimentos</b>
+            <a href="#abastecimentos" class="muted" style="font-size:12.5px">ver todos →</a>
+          </div>
+          <div id="comb-ultimos" class="mt"></div>
         </div>
-        <div id="comb-ultimos" class="mt"></div>
       </div>`;
 
     root.querySelector("#btn-abast").addEventListener("click", () => abrirForm(null));
     ligarGoto(root);
+    ligarComparador(root);
 
     const wrap = root.querySelector("#comb-ultimos");
     if (!ultimos.length) {
@@ -245,6 +308,147 @@ const ViewAbastecimentos = (() => {
       tbody.appendChild(tr);
     }
     wrap.appendChild(tbl);
+  }
+
+  return { render };
+})();
+
+// Aba: Veículo — perfil, contador de revisão e manutenção programada
+const ViewVeiculo = (() => {
+  function num(t) { if (t == null || String(t).trim() === "") return null; return U.parseMoney(t); }
+
+  function abrirPerfil() {
+    const v = Store.fuelVehicle();
+    const cons = Store.fuelConsumoPorFuel();
+    UI.modal("Perfil do veículo", `
+      <label class="fld"><span>Modelo</span><input type="text" name="modelo" value="${U.esc(v.modelo || "")}" placeholder="ex: marca modelo ano"></label>
+      <div class="fld-2">
+        <label class="fld"><span>Tanque (litros)</span><input type="text" name="tanque" inputmode="decimal" value="${v.tanque != null ? v.tanque : ""}" placeholder="ex: 45"></label>
+        <label class="fld"><span>Pneu</span><input type="text" name="pneu" value="${U.esc(v.pneu || "")}" placeholder="ex: 185/65 R15"></label>
+      </div>
+      <label class="fld"><span>Próxima revisão (km)</span><input type="text" name="revisaoKm" inputmode="decimal" value="${v.revisaoKm != null ? v.revisaoKm : ""}" placeholder="ex: 40000"></label>
+      <div class="fld-2">
+        <label class="fld"><span>Consumo álcool (km/l)</span><input type="text" name="consumoAlcool" inputmode="decimal" value="${v.consumoAlcool != null ? v.consumoAlcool : ""}" placeholder="${cons.alcool ? "real: " + cons.alcool.toFixed(1) : "ex: 11"}"></label>
+        <label class="fld"><span>Consumo gasolina (km/l)</span><input type="text" name="consumoGasolina" inputmode="decimal" value="${v.consumoGasolina != null ? v.consumoGasolina : ""}" placeholder="${cons.gasolina ? "real: " + cons.gasolina.toFixed(1) : "ex: 17,4"}"></label>
+      </div>
+      <p class="muted" style="font-size:12px">Deixe os consumos em branco para o app usar a média real calculada do seu histórico.</p>
+    `, (form) => {
+      Store.setFuelVehicle({
+        modelo: form.modelo.value.trim(),
+        tanque: num(form.tanque.value),
+        pneu: form.pneu.value.trim(),
+        revisaoKm: num(form.revisaoKm.value),
+        consumoAlcool: num(form.consumoAlcool.value),
+        consumoGasolina: num(form.consumoGasolina.value)
+      });
+      App.render();
+    });
+  }
+
+  function abrirManut(item) {
+    const it = item || {};
+    UI.modal(item ? "Editar item de manutenção" : "Novo item de manutenção", `
+      <label class="fld"><span>Descrição</span><input type="text" name="desc" value="${U.esc(it.desc || "")}" required placeholder="ex: Revisão / pneus / montagem"></label>
+      <label class="fld"><span>Valor previsto (R$)</span><input type="text" name="value" inputmode="decimal" value="${it.value != null ? it.value : ""}" placeholder="ex: 500"></label>
+      <label class="fld fld-check"><input type="checkbox" name="done" ${it.done ? "checked" : ""}><span>Já pago / feito</span></label>
+    `, (form) => {
+      if (!form.desc.value.trim()) return false;
+      const dados = { desc: form.desc.value.trim(), value: num(form.value.value) || 0, done: form.done.checked };
+      if (item) Store.updateMaintenance(item.id, dados);
+      else Store.addMaintenance(dados);
+      App.render();
+    });
+  }
+
+  function render(root) {
+    const v = Store.fuelVehicle();
+    const kmAtual = Store.fuelKmAtual();
+    const cons = Store.fuelConsumoPorFuel();
+    const pace = Store.fuelPaceKmDia();
+    const faltam = (v.revisaoKm != null && kmAtual != null) ? v.revisaoKm - kmAtual : null;
+    const dias = (faltam != null && faltam > 0 && pace) ? Math.round(faltam / pace) : null;
+    let dataPrev = null;
+    if (dias != null) { const d = new Date(Date.now() + dias * 86400000); dataPrev = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; }
+
+    const manut = Store.fuelMaintenance();
+    const totalManut = manut.reduce((s, m) => s + (m.value || 0), 0);
+    const pendenteManut = manut.filter(m => !m.done).reduce((s, m) => s + (m.value || 0), 0);
+
+    root.innerHTML = `
+      <div class="page-head">
+        <h1>🚗 Veículo</h1>
+        <div class="spacer"></div>
+        <button class="btn-primary" id="btn-perfil">✎ Editar veículo</button>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <b style="font-size:15px">${v.modelo ? U.esc(v.modelo) : "Meu veículo"}</b>
+          <table class="tbl mt">
+            <tbody>
+              <tr><td class="muted">Km atual</td><td class="num">${kmAtual != null ? kmAtual.toLocaleString("pt-BR") + " km" : "—"}</td></tr>
+              <tr><td class="muted">Tanque</td><td class="num">${v.tanque != null ? v.tanque + " L" : "—"}</td></tr>
+              <tr><td class="muted">Pneu</td><td class="num">${v.pneu ? U.esc(v.pneu) : "—"}</td></tr>
+              <tr><td class="muted">Consumo álcool</td><td class="num">${(v.consumoAlcool || cons.alcool) ? (v.consumoAlcool || cons.alcool).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km/l" : "—"}</td></tr>
+              <tr><td class="muted">Consumo gasolina</td><td class="num">${(v.consumoGasolina || cons.gasolina) ? (v.consumoGasolina || cons.gasolina).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km/l" : "—"}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card stat">
+          <div class="stat-label">🔧 Próxima revisão</div>
+          <div class="stat-value num">${v.revisaoKm != null ? v.revisaoKm.toLocaleString("pt-BR") + " km" : "—"}</div>
+          ${faltam != null ? `<div class="stat-sub">${faltam > 0
+            ? `faltam <b>${faltam.toLocaleString("pt-BR")} km</b>${dataPrev ? ` · previsão ~<b>${dataPrev}</b>` : ""}`
+            : `<b class="neg">vencida há ${Math.abs(faltam).toLocaleString("pt-BR")} km</b>`}</div>
+            ${faltam > 0 && v.revisaoKm ? `<div class="revbar mt"><div class="revbar-fill" style="width:${Math.max(4, Math.min(100, 100 - (faltam / (v.revisaoKm >= 10000 ? 10000 : v.revisaoKm)) * 100))}%"></div></div>` : ""}`
+            : `<div class="stat-sub muted">informe a km da revisão no perfil</div>`}
+        </div>
+      </div>
+      <div class="card mt">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <b style="font-size:15px">🔧 Manutenção programada</b>
+          <button class="btn-sm" id="btn-manut">+ Item</button>
+        </div>
+        <div id="manut-lista" class="mt"></div>
+      </div>`;
+
+    root.querySelector("#btn-perfil").addEventListener("click", abrirPerfil);
+    root.querySelector("#btn-manut").addEventListener("click", () => abrirManut(null));
+
+    const wrap = root.querySelector("#manut-lista");
+    if (!manut.length) {
+      wrap.innerHTML = `<p class="empty">Nenhum item de manutenção. Ex.: revisão, pneus, montagem.</p>`;
+      return;
+    }
+    const tbl = U.el(`
+      <table class="tbl">
+        <thead><tr><th>Item</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>`);
+    const tbody = tbl.querySelector("tbody");
+    for (const m of manut) {
+      const tr = U.el(`
+        <tr>
+          <td>${U.esc(m.desc)}</td>
+          <td class="num">${U.brl(m.value)}</td>
+          <td>${m.done ? '<span class="chip pago">FEITO</span>' : '<span class="chip aberto">PREVISTO</span>'}</td>
+          <td class="num" style="white-space:nowrap">
+            <button class="btn-sm ed" title="Editar">✎</button>
+            <button class="btn-sm btn-danger rm" title="Excluir">🗑</button>
+          </td>
+        </tr>`);
+      tr.querySelector(".ed").addEventListener("click", () => abrirManut(m));
+      tr.querySelector(".rm").addEventListener("click", () => {
+        UI.confirmar(`Excluir "${m.desc}"?`, () => { Store.removeMaintenance(m.id); App.render(); });
+      });
+      tbody.appendChild(tr);
+    }
+    const foot = U.el(`
+      <div class="cartoes-total mt">
+        <span>Total previsto: <b>${U.brl(totalManut)}</b></span>
+        <span>Ainda a pagar: <b class="neg">${U.brl(pendenteManut)}</b></span>
+      </div>`);
+    wrap.appendChild(tbl);
+    wrap.appendChild(foot);
   }
 
   return { render };

@@ -21,8 +21,12 @@ const Store = (() => {
       budgets: {},
       cardTx: [],
       investments: { assets: [], fixed: [], quotes: {}, history: [] },
-      fuel: { entries: [] }
+      fuel: { entries: [], vehicle: defaultVehicle(), maintenance: [] }
     };
+  }
+
+  function defaultVehicle() {
+    return { modelo: "", tanque: null, pneu: "", revisaoKm: null, consumoAlcool: null, consumoGasolina: null };
   }
 
   function categoriasPadrao() {
@@ -130,6 +134,11 @@ const Store = (() => {
       // Novo controle: Combustível (consumo). Só acrescenta o campo, nada existente muda.
       if (!st.fuel) st.fuel = { entries: [] };
       st.version = 6;
+    }
+    // Perfil do veículo + manutenção do controle Combustível (idempotente; só acrescenta).
+    if (st.fuel) {
+      if (st.fuel.vehicle === undefined || st.fuel.vehicle === null) st.fuel.vehicle = defaultVehicle();
+      if (!Array.isArray(st.fuel.maintenance)) st.fuel.maintenance = [];
     }
     return st;
   }
@@ -561,6 +570,56 @@ const Store = (() => {
     };
   }
 
+  // Perfil do veículo
+  function fuelVehicle() {
+    if (!state.fuel) state.fuel = { entries: [] };
+    if (!state.fuel.vehicle) state.fuel.vehicle = defaultVehicle();
+    return state.fuel.vehicle;
+  }
+  function setFuelVehicle(patch) { Object.assign(fuelVehicle(), patch); save(); }
+
+  // Manutenção programada (itens { id, desc, value, done })
+  function fuelMaintenance() {
+    if (!state.fuel) state.fuel = { entries: [] };
+    if (!Array.isArray(state.fuel.maintenance)) state.fuel.maintenance = [];
+    return state.fuel.maintenance;
+  }
+  function addMaintenance(item) { fuelMaintenance().push({ id: U.id(), done: false, ...item }); save(); }
+  function updateMaintenance(id, patch) { const it = fuelMaintenance().find(x => x.id === id); if (it) { Object.assign(it, patch); save(); } }
+  function removeMaintenance(id) { state.fuel.maintenance = fuelMaintenance().filter(x => x.id !== id); save(); }
+
+  // Km atual = maior hodômetro registrado
+  function fuelKmAtual() {
+    const ods = (state.fuel && state.fuel.entries ? state.fuel.entries : []).map(e => e.odometer).filter(v => v != null);
+    return ods.length ? Math.max(...ods) : null;
+  }
+  // Ritmo médio (km/dia) entre o primeiro e o último registro com hodômetro
+  function fuelPaceKmDia() {
+    const list = fuelEntries().filter(e => e.odometer != null);
+    if (list.length < 2) return null;
+    const a = list[0], b = list[list.length - 1];
+    const dias = (new Date(b.date) - new Date(a.date)) / 86400000;
+    return dias > 0 ? (b.odometer - a.odometer) / dias : null;
+  }
+  // Consumo médio real por combustível (km/l), a partir dos intervalos tanque cheio → tanque cheio
+  function fuelConsumoPorFuel() {
+    const comp = fuelEntriesComputed().filter(e => e.kmL != null && e.segLiters != null);
+    const acc = {};
+    for (const e of comp) {
+      const f = e.fuelType || "?";
+      if (!acc[f]) acc[f] = { dist: 0, liters: 0 };
+      acc[f].dist += e.segDist; acc[f].liters += e.segLiters;
+    }
+    const out = {};
+    for (const f in acc) out[f] = acc[f].liters > 0 ? acc[f].dist / acc[f].liters : null;
+    return out;
+  }
+  // Último preço informado de um combustível (para pré-preencher o comparador)
+  function fuelUltimoPreco(fuelType) {
+    const list = fuelEntries().filter(e => e.fuelType === fuelType && e.pricePerLiter != null);
+    return list.length ? list[list.length - 1].pricePerLiter : null;
+  }
+
   // ---------- Exportar / importar ----------
   function exportJSON() { return JSON.stringify(state, null, 2); }
   function importJSON(txt) {
@@ -582,6 +641,8 @@ const Store = (() => {
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
+    fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance,
+    fuelKmAtual, fuelPaceKmDia, fuelConsumoPorFuel, fuelUltimoPreco,
     exportJSON, importJSON, resetAll
   };
 })();

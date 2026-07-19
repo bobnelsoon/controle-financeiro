@@ -25,6 +25,7 @@ const App = (() => {
       rotas: {
         combustivel:    { titulo: "Resumo",         icone: "⛽", view: () => ViewCombustivel },
         abastecimentos: { titulo: "Abastecimentos", icone: "🧾", view: () => ViewAbastecimentos },
+        veiculo:        { titulo: "Veículo",        icone: "🚗", view: () => ViewVeiculo },
         config:         rotaConfig
       }
     }
