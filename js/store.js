@@ -186,6 +186,29 @@ const Store = (() => {
   }
   function addCardTx(tx) { state.cardTx.push(tx); save(); }
   function removeCardTx(id) { state.cardTx = state.cardTx.filter(t => t.id !== id); save(); }
+  function removeCardTxIds(ids) { const set = new Set(ids); state.cardTx = (state.cardTx || []).filter(t => !set.has(t.id)); save(); }
+
+  // Descobre base/parcela a partir da descrição no formato "descrição NN/MM"
+  function cardTxParcelaInfo(desc) {
+    const m = /^(.*?)\s+(\d{2})\/(\d{2})$/.exec(desc || "");
+    return m ? { base: m[1], i: m[2], n: m[3] } : null;
+  }
+  // Todas as parcelas irmãs de uma compra parcelada: por groupId (compras novas) ou,
+  // no fallback, pela descrição base + mesmo cartão (compras antigas, sem groupId).
+  function cardTxParcelas(tx) {
+    const all = state.cardTx || [];
+    if (tx.groupId) {
+      const g = all.filter(t => t.groupId === tx.groupId);
+      if (g.length) return g;
+    }
+    const info = cardTxParcelaInfo(tx.desc);
+    if (!info) return [tx];
+    return all.filter(t => {
+      if (t.accountId !== tx.accountId) return false;
+      const pi = cardTxParcelaInfo(t.desc);
+      return pi && pi.base === info.base && pi.n === info.n;
+    });
+  }
 
   // Valor automático do item "Cartão (fatura)": total da fatura do mês, negativo
   function autoCartaoValue(ymStr) {
@@ -439,7 +462,7 @@ const Store = (() => {
     monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
-    cardTxDoMes, faturaTotal, addCardTx, removeCardTx,
+    cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     exportJSON, importJSON, resetAll

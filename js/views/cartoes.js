@@ -44,15 +44,18 @@ const ViewCartoes = (() => {
       const n = Math.max(1, Number(form.parcelas.value) || 1);
       const vParc = Math.round((Math.abs(total) / n) * 100) / 100;
       const base = form.fatura.value || mesSel;
+      const groupId = n > 1 ? U.id() : null; // liga as parcelas para excluir todas de uma vez
       for (let i = 0; i < n; i++) {
-        Store.addCardTx({
+        const tx = {
           id: U.id(),
           ym: U.ymAdd(base, i),
           accountId: form.conta.value,
           desc: form.desc.value.trim() + (n > 1 ? ` ${String(i + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}` : ""),
           value: vParc,
           date: form.data.value || null
-        });
+        };
+        if (groupId) tx.groupId = groupId;
+        Store.addCardTx(tx);
       }
       App.render();
     });
@@ -123,10 +126,26 @@ const ViewCartoes = (() => {
             <td><button class="btn-sm btn-danger" title="Excluir">✕</button></td>
           </tr>`);
         tr.querySelector("button").addEventListener("click", () => {
-          UI.confirmar(`Excluir "${t.desc}" da fatura de ${U.ymLabel(mesSel)}?`, () => {
-            Store.removeCardTx(t.id);
-            App.render();
-          });
+          const parcelas = Store.cardTxParcelas(t);
+          if (parcelas.length > 1) {
+            const n = parcelas.length;
+            const totalParc = parcelas.reduce((s, p) => s + p.value, 0);
+            const ov = UI.modal("Excluir compra parcelada",
+              `<p>Esta compra tem <b>${n} parcela(s)</b> espalhadas por vários meses (total ${U.brl(totalParc)}).</p>
+               <p>Quer excluir <b>todas as ${n} parcelas</b> ou só esta parcela desta fatura?</p>`,
+              () => { Store.removeCardTxIds(parcelas.map(p => p.id)); App.render(); return true; },
+              { okLabel: `Excluir todas as ${n} parcelas`, extraBtn: `<button type="button" class="btn-so-esta">Só esta parcela</button>` });
+            ov.querySelector(".btn-so-esta").addEventListener("click", () => {
+              Store.removeCardTx(t.id);
+              UI.closeModal();
+              App.render();
+            });
+          } else {
+            UI.confirmar(`Excluir "${t.desc}" da fatura de ${U.ymLabel(mesSel)}?`, () => {
+              Store.removeCardTx(t.id);
+              App.render();
+            });
+          }
         });
         tbody.appendChild(tr);
       }
