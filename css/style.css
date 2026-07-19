@@ -90,6 +90,10 @@ body {
 .stat .stat-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .stat .stat-value { font-size: 22px; font-weight: 700; }
 .stat .stat-sub { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+/* Card com dois valores (Receitas + Disponível no mês): fonte menor p/ caber tudo */
+.stat-duplo .stat-value { font-size: 18px; }
+.stat-duplo .stat-linha2 { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.stat-duplo .stat-linha2 .stat-label { margin-bottom: 2px; }
 .card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; }
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
 .card.clickable .btn-sm { cursor: pointer; }
