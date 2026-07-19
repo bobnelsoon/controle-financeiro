@@ -639,6 +639,7 @@ const Store = (() => {
   function addMaintenance(item) { fuelMaintenance().push({ id: U.id(), done: false, ...item }); save(); }
   function updateMaintenance(id, patch) { const it = fuelMaintenance().find(x => x.id === id); if (it) { Object.assign(it, patch); save(); } }
   function removeMaintenance(id) { state.fuel.maintenance = fuelMaintenance().filter(x => x.id !== id); save(); }
+  function clearMaintenance() { fuelMaintenance(); state.fuel.maintenance = []; save(); }
 
   // Km atual = maior hodômetro registrado
   function fuelKmAtual() {
@@ -693,7 +694,7 @@ const Store = (() => {
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
-    fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance,
+    fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
     fuelKmAtual, fuelPaceKmDia, fuelConsumoPorFuel, fuelUltimoPreco,
     fuelGastoPorMes, fuelPrevisaoProxMes,
     exportJSON, importJSON, resetAll

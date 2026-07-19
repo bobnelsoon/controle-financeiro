@@ -126,8 +126,10 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   nos KPIs; `fuelStats` devolve `tollMes`/`tollTotal` à parte. `Store.fuelStats(ym)` dá consumo médio/último
   (blended entre combustíveis), custo/km, gasto do mês (só combustível), preço médio do litro, km do mês, pedágio.
   Aba **Resumo** (`ViewCombustivel`) = KPIs + últimos abastecimentos; aba **Abastecimentos** (`ViewAbastecimentos`)
-  = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): cola JSON
-  (`date, km, fuel, local, liters, price, paid, toll, obs`), `Store.addFuelMany`/`clearFuel`. Import marca como
+  = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): aceita uma
+  **lista** de abastecimentos (`date, km, fuel, local, liters, price, paid, toll, obs`) **ou** um **objeto
+  completo** `{ vehicle, maintenance, entries }` (carrega perfil do veículo + manutenção + abastecimentos de
+  uma vez; nomes de campo flexíveis). `Store.addFuelMany`/`clearFuel`/`setFuelVehicle`/`addMaintenance`/`clearMaintenance`. Import marca como
   **parcial** o que a obs indica (parcial/mínimo/reforço) **ou** dois abastecimentos no mesmo hodômetro (não
   fecham tanque). **Nunca versionar dados reais do usuário** — a importação roda só no navegador dele
   (nem placeholders de exemplo no código podem conter dados reais do usuário).

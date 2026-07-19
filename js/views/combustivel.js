@@ -125,47 +125,92 @@ const ViewCombustivel = (() => {
     }
   }
 
-  // Importar histórico colado em JSON (roda no navegador do usuário; nada sai do aparelho).
+  // Mapeia um abastecimento cru (vários nomes de campo aceitos) para o formato do app.
+  function mapEntry(r, kmCount) {
+    const liters = num(r.liters);
+    const temAbast = liters != null && liters > 0;
+    const local = (r.local && r.local !== "—") ? String(r.local).trim() : "";
+    const odometer = num(r.km != null ? r.km : r.odometer);
+    const kmRepetido = odometer != null && kmCount[odometer] > 1;
+    return {
+      date: r.date || U.hojeISO(),
+      odometer,
+      liters: temAbast ? liters : null,
+      pricePerLiter: temAbast ? num(r.price != null ? r.price : r.pricePerLiter) : null,
+      total: temAbast ? num(r.paid != null ? r.paid : r.total) : null,
+      fuelType: temAbast ? (MAPA_FUEL[String(r.fuel || "").toLowerCase().trim()] || null) : null,
+      local,
+      toll: num(r.toll) || 0,
+      obs: r.obs ? String(r.obs).trim() : "",
+      full: temAbast ? (!obsIndicaParcial(r.obs) && !kmRepetido) : false
+    };
+  }
+
+  // Importar em JSON: aceita uma LISTA de abastecimentos OU um OBJETO completo
+  // { vehicle, maintenance, entries } — assim dá pra carregar o controle inteiro de uma vez.
   function abrirImportar() {
-    UI.modal("Importar abastecimentos", `
-      <p class="muted" style="font-size:12.5px;margin-top:0">Cole uma lista em JSON. Campos aceitos por item:
-      <code>date, km, fuel, local, liters, price, paid, toll, obs</code>. Itens só de pedágio (sem litros) também entram.</p>
-      <label class="fld"><span>Dados (JSON)</span><textarea name="json" rows="9" placeholder='[{"date":"2026-01-15","km":50000,"fuel":"Gasolina","local":"cidade","liters":30,"price":5.49,"paid":164.70,"toll":0,"obs":"Completou tanque"}]'></textarea></label>
-      <label class="fld fld-check"><input type="checkbox" name="clear"><span>Substituir os abastecimentos atuais (apaga os que já existem)</span></label>
+    UI.modal("Importar combustível", `
+      <p class="muted" style="font-size:12.5px;margin-top:0">Cole um JSON. Pode ser só a <b>lista de abastecimentos</b>
+      <code>[{date, km, fuel, local, liters, price, paid, toll, obs}]</code> ou um <b>objeto completo</b> com
+      <code>vehicle</code>, <code>maintenance</code> e <code>entries</code> (veículo + manutenção + abastecimentos).</p>
+      <label class="fld"><span>Dados (JSON)</span><textarea name="json" rows="10" placeholder='{"vehicle":{"modelo":"...","tanque":45,"pneu":"...","revisaoKm":40000},"maintenance":[{"desc":"Revisão","value":500,"done":false}],"entries":[{"date":"2026-01-15","km":50000,"fuel":"Gasolina","liters":30,"price":5.49,"paid":164.70}]}'></textarea></label>
+      <label class="fld fld-check"><input type="checkbox" name="clear"><span>Substituir os dados atuais (apaga abastecimentos e manutenção antes de importar)</span></label>
       <div id="imp-msg" class="muted" style="font-size:12.5px"></div>
     `, (form) => {
       const msg = form.querySelector("#imp-msg");
-      let arr;
-      try { arr = JSON.parse(form.json.value); }
+      let dados;
+      try { dados = JSON.parse(form.json.value); }
       catch (err) { msg.innerHTML = `<span class="neg">JSON inválido: ${U.esc(err.message)}</span>`; return false; }
-      if (!Array.isArray(arr)) { msg.innerHTML = `<span class="neg">Esperado uma lista [ ... ].</span>`; return false; }
 
-      // Dois abastecimentos no mesmo hodômetro (ex.: completar em dois postos na mesma parada)
-      // não fecham um tanque cheio válido → tratados como parciais no cálculo de consumo.
+      // Aceita lista pura (só abastecimentos) ou objeto completo.
+      let entries = [], vehicle = null, maintenance = null;
+      if (Array.isArray(dados)) {
+        entries = dados;
+      } else if (dados && typeof dados === "object") {
+        entries = dados.entries || dados.abastecimentos || [];
+        vehicle = dados.vehicle || dados.veiculo || null;
+        maintenance = dados.maintenance || dados.manutencao || null;
+      } else {
+        msg.innerHTML = `<span class="neg">Esperado uma lista [ ... ] ou um objeto { ... }.</span>`; return false;
+      }
+      if (!Array.isArray(entries)) { msg.innerHTML = `<span class="neg">"entries" deve ser uma lista.</span>`; return false; }
+
+      // Abastecimentos: dois no mesmo hodômetro contam como parciais no consumo.
       const kmCount = {};
-      for (const r of arr) { const k = num(r.km != null ? r.km : r.odometer); if (k != null) kmCount[k] = (kmCount[k] || 0) + 1; }
+      for (const r of entries) { const k = num(r.km != null ? r.km : r.odometer); if (k != null) kmCount[k] = (kmCount[k] || 0) + 1; }
+      const novos = entries.map((r) => mapEntry(r, kmCount));
 
-      const novos = arr.map((r) => {
-        const liters = num(r.liters);
-        const temAbast = liters != null && liters > 0;
-        const local = (r.local && r.local !== "—") ? String(r.local).trim() : "";
-        const odometer = num(r.km != null ? r.km : r.odometer);
-        const kmRepetido = odometer != null && kmCount[odometer] > 1;
-        return {
-          date: r.date || U.hojeISO(),
-          odometer,
-          liters: temAbast ? liters : null,
-          pricePerLiter: temAbast ? num(r.price != null ? r.price : r.pricePerLiter) : null,
-          total: temAbast ? num(r.paid != null ? r.paid : r.total) : null,
-          fuelType: temAbast ? (MAPA_FUEL[String(r.fuel || "").toLowerCase().trim()] || null) : null,
-          local,
-          toll: num(r.toll) || 0,
-          obs: r.obs ? String(r.obs).trim() : "",
-          full: temAbast ? (!obsIndicaParcial(r.obs) && !kmRepetido) : false
-        };
-      });
-      if (form.clear.checked) Store.clearFuel();
-      Store.addFuelMany(novos);
+      if (form.clear.checked) { Store.clearFuel(); Store.clearMaintenance(); }
+      if (novos.length) Store.addFuelMany(novos);
+
+      // Perfil do veículo (nomes flexíveis).
+      if (vehicle && typeof vehicle === "object") {
+        const patch = {};
+        const modelo = vehicle.modelo || vehicle.model || vehicle.veiculo;
+        const pneu = vehicle.pneu || vehicle.tire || vehicle.pneus;
+        const tanque = vehicle.tanque != null ? vehicle.tanque : vehicle.tank;
+        const rev = vehicle.revisaoKm != null ? vehicle.revisaoKm : (vehicle.km_revisao_meta != null ? vehicle.km_revisao_meta : vehicle.revisao);
+        const cA = vehicle.consumoAlcool != null ? vehicle.consumoAlcool : vehicle.media_alcool;
+        const cG = vehicle.consumoGasolina != null ? vehicle.consumoGasolina : vehicle.media_gasolina;
+        if (modelo != null) patch.modelo = String(modelo).trim();
+        if (pneu != null) patch.pneu = String(pneu).trim();
+        if (tanque != null) patch.tanque = num(tanque);
+        if (rev != null) patch.revisaoKm = num(rev);
+        if (cA != null) patch.consumoAlcool = num(cA);
+        if (cG != null) patch.consumoGasolina = num(cG);
+        if (Object.keys(patch).length) Store.setFuelVehicle(patch);
+      }
+
+      // Manutenção programada.
+      if (Array.isArray(maintenance)) {
+        if (!form.clear.checked) Store.clearMaintenance(); // evita duplicar ao reimportar
+        for (const m of maintenance) {
+          const desc = m.desc || m.item || m.nome;
+          if (!desc) continue;
+          Store.addMaintenance({ desc: String(desc).trim(), value: num(m.value != null ? m.value : m.valor) || 0, done: !!(m.done || m.feito || m.pago) });
+        }
+      }
+
       App.render();
     }, { okLabel: "Importar" });
   }
