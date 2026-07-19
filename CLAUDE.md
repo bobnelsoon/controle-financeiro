@@ -124,11 +124,14 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-Última versão **publicada na `main`**: `v13` / cache `202607200300` (PRs #1 a #10 mesclados). **Nada
+Última versão **publicada na `main`**: `v14` / cache `202607200400` (PRs #1 a #11 mesclados). **Nada
 pendente para publicar** — a branch `claude/project-updates-2r7rf9` e a `main` estão em dia. O usuário
-está satisfeito ("está ótimo") e volta quando quiser ajustar algo novo.
+está satisfeito e volta quando quiser ajustar algo novo.
 
-No ar (v13) e estável:
+No ar (v14) e estável:
+- **Cards Receitas/Despesas do mês** (topo, informativos do mês atual): separados **pelo sinal** do
+  lançamento — positivo → Receitas, negativo → Despesas (não se misturam; positivo NÃO abate despesa).
+  Ambos com subtítulo ("fixas + lançamentos" / "fixas + lançamentos + fatura do cartão").
 - **Dashboard**: seção de investimentos no rodapé (**Carteira de investimentos** + **Composição da
   carteira**); saiu o gráfico "Despesas por categoria" e o KPI "Patrimônio investido" do topo.
 - **iPhone / safe areas** (v12): `viewport-fit=cover`, metas de web app, `theme-color`,
