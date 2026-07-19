@@ -37,10 +37,19 @@ const ViewDashboard = (() => {
     const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Disponível no mês = o que já está na conta + as receitas fixas que ainda faltam receber.
-    // Lançamentos e receitas já recebidas NÃO entram (já estão embutidos no saldo), então o
-    // número fica estável e não infla a cada lançamento.
-    const disponivelMes = saldoConta != null ? Math.round((saldoConta + receitasFixasAReceber) * 100) / 100 : null;
+    // Parcelas de empréstimo A RECEBER (ABERTO) que vencem neste mês — também são recebíveis.
+    // Empréstimos não mexem no saldoContaAtual, então somar aqui não conta em dobro.
+    let emprestimosAReceber = 0;
+    for (const l of st.loans) {
+      for (const p of (l.items || [])) {
+        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymAtual) emprestimosAReceber += (p.value || 0);
+      }
+    }
+    // Disponível no mês = o que já está na conta + tudo que ainda falta receber neste mês
+    // (receitas fixas do fluxo + parcelas de empréstimo a receber). Lançamentos e itens já
+    // recebidos NÃO entram (já estão embutidos no saldo), então o número não infla à toa.
+    const aReceberMes = Math.round((receitasFixasAReceber + emprestimosAReceber) * 100) / 100;
+    const disponivelMes = saldoConta != null ? Math.round((saldoConta + aReceberMes) * 100) / 100 : null;
     // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
     const pProx = serie.find(p => p.ym === ymFatura);
     const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
@@ -133,7 +142,7 @@ const ViewDashboard = (() => {
           <div class="stat-linha2">
             <div class="stat-label">Disponível no mês</div>
             <div class="stat-value num ${U.clsValor(disponivelMes)}">${U.brl(disponivelMes)}</div>
-            <div class="stat-sub">saldo em conta + receitas fixas a receber</div>
+            <div class="stat-sub">saldo + receitas e empréstimos a receber no mês</div>
           </div>` : ""}
         </div>
         <div class="card stat clickable" data-goto="fluxo">
