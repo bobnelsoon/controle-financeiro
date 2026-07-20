@@ -114,6 +114,55 @@ const ViewInvestimentos = (() => {
     });
   }
 
+  // Importar carteira em JSON: lista de ativos [{ticker,type,qty,avgPrice}] ou objeto
+  // { assets:[...], fixed:[...] }. Atualiza pelo ticker (sobrescreve qtd/preço médio) ou adiciona.
+  function abrirImportar() {
+    UI.modal("Importar investimentos", `
+      <p class="muted" style="font-size:12.5px;margin-top:0">Cole um JSON: a <b>lista de ativos</b>
+      <code>[{ticker, type, qty, avgPrice}]</code> ou um <b>objeto</b> <code>{assets:[...], fixed:[...]}</code>
+      (ações/FIIs + renda fixa). O <b>preço médio</b> alimenta o ganho/perda; a cotação é buscada depois.</p>
+      <label class="fld"><span>Dados (JSON)</span><textarea name="json" rows="9" placeholder='{"assets":[{"ticker":"MXRF11","type":"fii","qty":50,"avgPrice":9.75},{"ticker":"ITUB4","type":"acao","qty":2,"avgPrice":44.37}]}'></textarea></label>
+      <label class="fld fld-check"><input type="checkbox" name="clear"><span>Substituir a carteira atual (apaga ações/FIIs antes de importar)</span></label>
+      <div id="imp-msg" class="muted" style="font-size:12.5px"></div>
+    `, (form) => {
+      const msg = form.querySelector("#imp-msg");
+      let dados;
+      try { dados = JSON.parse(form.json.value); }
+      catch (err) { msg.innerHTML = `<span class="neg">JSON inválido: ${U.esc(err.message)}</span>`; return false; }
+
+      let assets = [], fixed = null;
+      if (Array.isArray(dados)) { assets = dados; }
+      else if (dados && typeof dados === "object") { assets = dados.assets || dados.ativos || []; fixed = dados.fixed || dados.rendaFixa || null; }
+      else { msg.innerHTML = `<span class="neg">Esperado uma lista [ ... ] ou um objeto { ... }.</span>`; return false; }
+      if (!Array.isArray(assets)) { msg.innerHTML = `<span class="neg">"assets" deve ser uma lista.</span>`; return false; }
+
+      const inv = Store.inv();
+      if (form.clear.checked) inv.assets = [];
+      for (const r of assets) {
+        const ticker = String(r.ticker != null ? r.ticker : (r.codigo || "")).trim().toUpperCase();
+        if (!ticker) continue;
+        const qty = Number(r.qty != null ? r.qty : (r.quantidade != null ? r.quantidade : r.cotas)) || 0;
+        const avgPrice = U.parseMoney(r.avgPrice != null ? r.avgPrice : (r.preco != null ? r.preco : (r.precoMedio != null ? r.precoMedio : r.price)));
+        let type = String(r.type != null ? r.type : (r.tipo || "")).toLowerCase();
+        if (type !== "fii" && type !== "acao") type = /11$/.test(ticker) ? "fii" : "acao";
+        const ex = inv.assets.find(a => a.ticker === ticker);
+        if (ex) { if (qty) ex.qty = qty; if (avgPrice != null) ex.avgPrice = avgPrice; ex.type = type; }
+        else inv.assets.push({ id: U.id(), ticker, type, qty, avgPrice });
+      }
+      if (Array.isArray(fixed)) {
+        if (form.clear.checked) inv.fixed = [];
+        for (const f of fixed) {
+          const name = String(f.name != null ? f.name : (f.nome || "")).trim();
+          if (!name) continue;
+          inv.fixed.push({ id: U.id(), name, type: (f.type || f.tipo || "Outro"), value: U.parseMoney(f.value != null ? f.value : f.valor), note: (f.note || f.obs || "") });
+        }
+      }
+      Store.save();
+      App.render();
+      atualizarCotacoes();
+    }, { okLabel: "Importar" });
+  }
+
   function render(root) {
     const inv = Store.inv();
     const ano = new Date().getFullYear();
@@ -158,7 +207,10 @@ const ViewInvestimentos = (() => {
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <h2 class="section" style="margin:0">Ações & FIIs</h2>
-          <button class="btn-sm" id="btn-ativo">+ Ativo</button>
+          <div class="row-gap">
+            <button class="btn-sm" id="btn-imp-inv">📥 Importar</button>
+            <button class="btn-sm" id="btn-ativo">+ Ativo</button>
+          </div>
         </div>
         <table class="tbl tbl-wide mt">
           <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço pago</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
@@ -181,6 +233,7 @@ const ViewInvestimentos = (() => {
 
     root.querySelector("#btn-att").addEventListener("click", atualizarCotacoes);
     root.querySelector("#btn-ativo").addEventListener("click", abrirNovoAtivo);
+    root.querySelector("#btn-imp-inv").addEventListener("click", abrirImportar);
     root.querySelector("#btn-rf").addEventListener("click", () => abrirRendaFixa(null));
 
     // Tabela de renda variável
