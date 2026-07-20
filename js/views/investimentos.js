@@ -121,7 +121,7 @@ const ViewInvestimentos = (() => {
       <p class="muted" style="font-size:12.5px;margin-top:0">Cole um JSON: a <b>lista de ativos</b>
       <code>[{ticker, type, qty, avgPrice}]</code> ou um <b>objeto</b> <code>{assets:[...], fixed:[...]}</code>
       (ações/FIIs + renda fixa). O <b>preço médio</b> alimenta o ganho/perda; a cotação é buscada depois.</p>
-      <label class="fld"><span>Dados (JSON)</span><textarea name="json" rows="9" placeholder='{"assets":[{"ticker":"MXRF11","type":"fii","qty":50,"avgPrice":9.75},{"ticker":"ITUB4","type":"acao","qty":2,"avgPrice":44.37}]}'></textarea></label>
+      <label class="fld"><span>Dados (JSON)</span><textarea name="json" rows="9" placeholder='{"assets":[{"ticker":"HGLG11","type":"fii","qty":10,"avgPrice":160.00},{"ticker":"PETR4","type":"acao","qty":100,"avgPrice":38.50}]}'></textarea></label>
       <label class="fld fld-check"><input type="checkbox" name="clear"><span>Substituir a carteira atual (apaga ações/FIIs antes de importar)</span></label>
       <div id="imp-msg" class="muted" style="font-size:12.5px"></div>
     `, (form) => {
