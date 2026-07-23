@@ -87,7 +87,7 @@ const App = (() => {
   function montarSeletorControles() {
     const brand = document.querySelector(".brand");
     brand.innerHTML = `
-      <span class="brand-nome">💼 Gestão Pessoal</span>
+      <span class="brand-nome">💼<span class="brand-txt"> Gestão Pessoal</span></span>
       <div class="ctrl-switch">
         <button class="ctrl-btn" id="btn-controles" aria-haspopup="true">Controles ▾</button>
         <div class="ctrl-menu" id="ctrl-menu" hidden>
