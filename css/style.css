@@ -69,7 +69,7 @@ body {
 /* Seletor de controles (Financeiro / Combustível / ...) */
 .ctrl-switch { position: relative; }
 .ctrl-btn {
-  font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap;
   border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); cursor: pointer;
 }
 .ctrl-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
@@ -88,11 +88,25 @@ body {
 
 /* Botão "Adicionar" (global, na marca) */
 .add-btn {
-  width: 100%; margin-top: 2px; padding: 7px 10px; border-radius: 999px;
+  width: 100%; margin-top: 2px; padding: 7px 10px; border-radius: 999px; white-space: nowrap;
   border: 1px solid var(--accent); background: var(--accent); color: #fff;
   font-weight: 600; font-size: 12.5px; cursor: pointer;
 }
 .add-btn:hover { filter: brightness(1.08); }
+
+/* Botão flutuante (FAB) do Adicionar — só aparece no mobile (ver media query) */
+.fab-add {
+  position: fixed; z-index: 50;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 14px));
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--accent); color: #fff; font-size: 30px; line-height: 1;
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.30); cursor: pointer;
+}
+.fab-add:hover { filter: brightness(1.08); }
+.fab-add:active { transform: scale(0.94); }
+.fab-add[hidden] { display: none !important; }
 
 /* Menu Adicionar (lista de opções no modal) */
 .add-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
@@ -191,10 +205,14 @@ body {
     /* Respeita a Dynamic Island / notch (topo e laterais em paisagem) */
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
   }
-  .brand { padding: 0 6px 0 2px; flex-direction: row; align-items: center; gap: 7px; }
+  .brand { padding: 0 6px 0 2px; flex-direction: row; align-items: center; gap: 6px; }
   .brand-nome { font-size: 14px; }
   .brand small { display: none; }
-  .ctrl-btn { padding: 3px 9px; font-size: 11.5px; }
+  .ctrl-btn { padding: 4px 10px; font-size: 11.5px; }
+  /* Adicionar do topo fica compacto e alinhado com o Controles (não ocupa a linha toda) */
+  .brand .add-btn { width: auto; margin-top: 0; padding: 4px 11px; font-size: 11.5px; }
+  /* Botão flutuante ➕ aparece só no mobile, sempre à mão */
+  .fab-add { display: flex; }
   .nav {
     display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
