@@ -205,12 +205,14 @@ body {
     /* Respeita a Dynamic Island / notch (topo e laterais em paisagem) */
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
   }
-  .brand { padding: 0 6px 0 2px; flex-direction: row; align-items: center; gap: 6px; }
-  .brand-nome { font-size: 14px; }
+  .brand { padding: 0 4px 0 2px; flex-direction: row; align-items: center; gap: 5px; }
+  .brand-nome { font-size: 18px; }
+  /* No celular a marca vira só o ícone 💼 — libera espaço para as abas rolarem */
+  .brand-txt { display: none; }
   .brand small { display: none; }
-  .ctrl-btn { padding: 4px 10px; font-size: 11.5px; }
-  /* Adicionar do topo fica compacto e alinhado com o Controles (não ocupa a linha toda) */
-  .brand .add-btn { width: auto; margin-top: 0; padding: 4px 11px; font-size: 11.5px; }
+  .ctrl-btn { padding: 4px 9px; font-size: 11.5px; }
+  /* No celular o Adicionar do topo some (o FAB flutuante já cobre) — libera a barra para as abas */
+  .brand .add-btn { display: none; }
   /* Botão flutuante ➕ aparece só no mobile, sempre à mão */
   .fab-add { display: flex; }
   .nav {

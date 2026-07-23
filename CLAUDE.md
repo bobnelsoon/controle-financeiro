@@ -161,10 +161,11 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (decisão do usuário). De lá o usuário entra num controle (`trocarControle` → 1ª aba dele) ou usa Adicionar.
 - **Seletor de controles + Adicionar** (`.brand`): botão "Controles ▾" abre `.ctrl-menu` (🏠 Início /
   💰 Financeiro / ⛽ Combustível; o ativo recebe `.ativo`) e o botão **➕ Adicionar** (`Adicionar.abrirMenu`)
-  fica logo abaixo, disponível em qualquer tela. Fecha ao clicar fora. No mobile a `.brand` vira linha e os
-  botões ficam compactos (`white-space:nowrap`, altura ~27px). Há também um **FAB flutuante** `➕` (`.fab-add`,
-  criado uma vez no `boot`, canto inferior direito, só no mobile via media query, escondido na tela inicial)
-  que abre o mesmo menu Adicionar — melhora a disponibilidade sem poluir a barra do topo.
+  fica logo abaixo, disponível em qualquer tela. Fecha ao clicar fora. **No mobile**: a `.brand` vira linha,
+  a marca vira **só o ícone 💼** (`.brand-txt` escondido) e o **Adicionar do topo some** (`.brand .add-btn`
+  display:none) — sobra espaço para as abas rolarem. O Adicionar no mobile fica pelo **FAB flutuante** `➕`
+  (`.fab-add`, criado uma vez no `boot`, canto inferior direito, só no mobile via media query, escondido na
+  tela inicial) que abre o mesmo menu. No desktop, o botão Adicionar continua na sidebar (sem FAB).
 - **Integração pelo Adicionar**: um lançamento atualiza os dois controles — Compra → `ViewCartoes.abrirNovaCompra`
   (cartão + parcelas); Abastecimento → `ViewCombustivel.abrirForm` (pode cair no cartão); Recebido/Pago →
   `Marcar.abrir` marca item fixo do fluxo (setCell com status), mexendo no saldo/fluxo/dashboard.
