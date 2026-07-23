@@ -64,6 +64,9 @@ const App = (() => {
     // Marca o controle ativo no menu de controles
     document.querySelectorAll(".ctrl-menu [data-ctrl]").forEach(b =>
       b.classList.toggle("ativo", b.dataset.ctrl === controleAtivo));
+    // O FAB do Adicionar some na tela inicial (que já tem o botão grande).
+    const fab = document.getElementById("fab-add");
+    if (fab) fab.hidden = (controleAtivo === "inicio");
   }
 
   function trocarControle(id) {
@@ -102,6 +105,13 @@ const App = (() => {
     brand.querySelector("#btn-adicionar").addEventListener("click", () => {
       if (typeof Adicionar !== "undefined") Adicionar.abrirMenu();
     });
+
+    // Botão flutuante (FAB) do Adicionar — criado uma vez, sempre à mão no mobile.
+    if (!document.getElementById("fab-add")) {
+      const fab = U.el(`<button class="fab-add" id="fab-add" title="Adicionar" aria-label="Adicionar">＋</button>`);
+      fab.addEventListener("click", () => { if (typeof Adicionar !== "undefined") Adicionar.abrirMenu(); });
+      document.body.appendChild(fab);
+    }
     // fecha ao clicar fora
     document.addEventListener("click", (e) => {
       if (menu && !menu.hidden && !brand.contains(e.target)) menu.hidden = true;
