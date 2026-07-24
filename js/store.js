@@ -4,6 +4,7 @@
 const Store = (() => {
   const KEY = "controle-financeiro-v1";
   let state = null;
+  let loadingState = false; // true durante load/migração: um save aí NÃO conta como alteração do usuário
 
   // ---------- Dados iniciais (importados de "1-Controle Financeiro 2026 Official 1207.xlsx") ----------
   // A versão publicada na internet define window.SEED_VAZIO = true e começa sem nenhum dado:
@@ -147,15 +148,22 @@ const Store = (() => {
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) { state = migrate(JSON.parse(raw)); save(); return; }
-    } catch (e) { console.error("Erro lendo dados salvos:", e); }
+      if (raw) {
+        loadingState = true;
+        try { state = migrate(JSON.parse(raw)); save(); }
+        finally { loadingState = false; }
+        return;
+      }
+    } catch (e) { console.error("Erro lendo dados salvos:", e); loadingState = false; }
     state = seed();
     save();
   }
 
   function save() {
     localStorage.setItem(KEY, JSON.stringify(state));
-    if (typeof Sync !== "undefined") Sync.onLocalSave(); // agenda envio para o outro aparelho
+    // Salvar durante o carregamento/migração NÃO conta como alteração do usuário — senão o app
+    // recém-aberto se marca como "o mais novo" e sobrescreve o cofre com dados velhos.
+    if (!loadingState && typeof Sync !== "undefined") Sync.onLocalSave(); // agenda envio para o outro aparelho
   }
 
   // ---------- Fluxo anual ----------

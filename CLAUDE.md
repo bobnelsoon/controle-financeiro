@@ -30,7 +30,10 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
 - `js/quotes.js` — `Quotes`: cotações de ações/FIIs (mfinance → brapi → Yahoo).
-- `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub.
+- `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
+  como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
+  `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
+  novo" e sobrescrevia o cofre com dados velhos; agora ele puxa a versão mais recente (`savedAt > lastChange`).
 - `js/ui.js` — `UI`: modal genérico, confirmação, selects.
 - `js/views/*.js` — uma view por aba (`ViewDashboard`, `ViewFluxo`, `ViewLancamentos`, `ViewCartoes`,
   `ViewEmprestimos`, `ViewInvestimentos`, `ViewOrcamento`, `ViewCombustivel`, `ViewAbastecimentos`,
