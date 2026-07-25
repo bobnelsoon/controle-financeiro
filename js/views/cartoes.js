@@ -93,6 +93,17 @@ const ViewCartoes = (() => {
       if (!txs.length && a.type !== "cartao") continue;
       algum = algum || txs.length > 0;
 
+      const paga = Store.faturaPaga(a.id, mesSel);
+      const restante = Store.faturaRestante(mesSel, a.id);
+      let btnPagar = "";
+      if (paga) {
+        btnPagar = `<span class="chip pago">✓ paga</span>`
+          + (restante > 0.005 ? `<button class="btn-sm pagar">Pagar restante</button>` : "")
+          + `<button class="btn-sm desfazer">Desfazer</button>`;
+      } else if (Math.abs(fatura) > 0.005) {
+        btnPagar = `<button class="btn-sm btn-pay pagar">✓ Pagar fatura</button>`;
+      }
+
       const card = U.el(`
         <div class="card mb">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -102,7 +113,9 @@ const ViewCartoes = (() => {
             </div>
             <div class="row-gap">
               <span class="tag num">Fatura ${U.ymLabel(mesSel)}: <b>${U.brl(fatura)}</b></span>
+              ${paga ? `<span class="tag num muted">pago: ${U.brl(paga.value)}</span>` : ""}
               ${a.limit ? `<span class="tag num">Limite ${U.brl(a.limit)}</span>` : ""}
+              ${btnPagar}
               <button class="btn-sm add">+ Compra</button>
               <button class="btn-sm ed">Editar</button>
             </div>
@@ -152,6 +165,17 @@ const ViewCartoes = (() => {
 
       card.querySelector(".add").addEventListener("click", () => abrirNovaCompra(a.id));
       card.querySelector(".ed").addEventListener("click", () => abrirConta(a));
+      const bPagar = card.querySelector(".pagar");
+      if (bPagar) bPagar.addEventListener("click", () => {
+        UI.confirmar(
+          `Marcar a fatura de ${a.name} (${U.ymLabel(mesSel)}, ${U.brl(fatura)}) como paga?\n\nO valor sai do Saldo em conta (o dinheiro saiu) e some do "a pagar" no Fluxo e no Dashboard.`,
+          () => { Store.pagarFatura(a.id, mesSel); App.render(); });
+      });
+      const bDesfazer = card.querySelector(".desfazer");
+      if (bDesfazer) bDesfazer.addEventListener("click", () => {
+        UI.confirmar(`Desfazer o pagamento da fatura de ${a.name} (${U.ymLabel(mesSel)})? O valor volta para o saldo e para o "a pagar".`,
+          () => { Store.desfazerFatura(a.id, mesSel); App.render(); });
+      });
       list.appendChild(card);
     }
 
