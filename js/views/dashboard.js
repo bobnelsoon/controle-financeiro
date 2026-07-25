@@ -10,7 +10,7 @@ const ViewDashboard = (() => {
     // Fatura vigente = o que você gastou agora, pago no mês seguinte
     const ymFatura = U.ymAdd(ymAtual, 1);
     const mesFatura = U.ymParse(ymFatura).m;
-    const gastoCartao = Store.faturaTotal(ymFatura, null); // positivo = total gasto no cartão
+    const gastoCartao = Store.faturaRestante(ymFatura, null); // positivo = fatura que ainda falta pagar
 
     // Receitas/despesas do mês: itens do fluxo + lançamentos avulsos.
     // O item "Cartão (fatura)" é ignorado aqui porque o gasto do cartão entra pela

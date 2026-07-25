@@ -70,13 +70,20 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   - a aba Cartões abre na **fatura vigente** (mês seguinte);
   - o dashboard mostra "fatura de <mês seguinte> (gastos de <mês atual>)".
   - `cardTx[].ym` guarda o mês de pagamento da fatura.
+  - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init
+    idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.
+    `faturaRestante(ym, accountId)` = `faturaTotal − pago` (compras novas numa fatura já paga voltam a
+    contar). O `autoCartaoValue` usa o **restante** (só o que falta pagar entra no "a pagar" do fluxo/dash),
+    e `saldoContaAtual` **subtrai** as faturas pagas depois da âncora (o dinheiro saiu). Botão "✓ Pagar
+    fatura"/"Desfazer" por cartão na aba Cartões. Simétrico a marcar um item do fluxo como Pago.
 
 - **Saldo em conta é automático e determinístico** (`Store.saldoContaAtual`): parte do valor informado
   (`settings.conta = { at, valor }`) e soma o que foi realizado **depois** da âncora `at`:
   células do fluxo marcadas Pago/Recebido (com `settledAt`/`settledValue`), lançamentos pix/débito
   (com `createdAt`) **e parcelas de empréstimo marcadas PAGO** (com `settledAt`, valor `p.value`). É
   recalculado a cada render (seguro para a sincronização). Reinformar o saldo recalibra a âncora
-  (`at = agora`). Compras no cartão NÃO mexem no saldo até a fatura ser paga. **Empréstimo simétrico ao
+  (`at = agora`). Compras no cartão NÃO mexem no saldo até a **fatura ser marcada como paga**
+  (`Store.pagarFatura` → `faturasPagas`, subtraído no saldo). **Empréstimo simétrico ao
   fluxo:** marcar uma parcela como PAGO grava `settledAt` e joga `p.value` no saldo — assim o valor sai
   do "a receber" e entra no saldo automaticamente, sem lançamento manual.
 

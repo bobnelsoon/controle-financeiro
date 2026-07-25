@@ -21,6 +21,7 @@ const Store = (() => {
       loans: [],
       budgets: {},
       cardTx: [],
+      faturasPagas: {},
       investments: { assets: [], fixed: [], quotes: {}, history: [] },
       fuel: { entries: [], vehicle: defaultVehicle(), maintenance: [] }
     };
@@ -141,6 +142,8 @@ const Store = (() => {
       if (st.fuel.vehicle === undefined || st.fuel.vehicle === null) st.fuel.vehicle = defaultVehicle();
       if (!Array.isArray(st.fuel.maintenance)) st.fuel.maintenance = [];
     }
+    // Faturas pagas por cartão/mês (idempotente).
+    if (!st.faturasPagas || typeof st.faturasPagas !== "object") st.faturasPagas = {};
     return st;
   }
 
@@ -233,10 +236,42 @@ const Store = (() => {
     });
   }
 
-  // Valor automático do item "Cartão (fatura)": total da fatura do mês, negativo
+  // ---------- Pagamento de fatura (por cartão + mês) ----------
+  // Marcar a fatura como paga: o valor pago some do "a pagar" (fluxo/dashboard) e sai do saldo
+  // em conta (o dinheiro saiu) — simétrico a marcar um item do fluxo como Pago.
+  function faturaKey(accountId, ymStr) { return accountId + "|" + ymStr; }
+  function faturaPaga(accountId, ymStr) {
+    const m = state.faturasPagas || {};
+    return m[faturaKey(accountId, ymStr)] || null;
+  }
+  function pagarFatura(accountId, ymStr) {
+    if (!state.faturasPagas) state.faturasPagas = {};
+    const value = Math.round(faturaTotal(ymStr, accountId) * 100) / 100;
+    state.faturasPagas[faturaKey(accountId, ymStr)] = { at: new Date().toISOString(), value };
+    save();
+  }
+  function desfazerFatura(accountId, ymStr) {
+    if (state.faturasPagas) delete state.faturasPagas[faturaKey(accountId, ymStr)];
+    save();
+  }
+  function faturasPagasTotal(ymStr) {
+    const m = state.faturasPagas || {};
+    let t = 0;
+    for (const k in m) { if (k.endsWith("|" + ymStr)) t += (m[k].value || 0); }
+    return Math.round(t * 100) / 100;
+  }
+  // O que ainda falta pagar da fatura (total − já pago). Novas compras numa fatura já paga
+  // voltam a contar como "a pagar".
+  function faturaRestante(ymStr, accountId) {
+    const p = accountId ? faturaPaga(accountId, ymStr) : null;
+    const pago = accountId ? (p ? p.value : 0) : faturasPagasTotal(ymStr);
+    return Math.max(0, Math.round((faturaTotal(ymStr, accountId) - pago) * 100) / 100);
+  }
+
+  // Valor automático do item "Cartão (fatura)": só o que ainda FALTA pagar no mês, negativo.
   function autoCartaoValue(ymStr) {
-    const tot = faturaTotal(ymStr, null);
-    return tot !== 0 ? -Math.round(tot * 100) / 100 : null;
+    const rest = faturaRestante(ymStr, null);
+    return rest !== 0 ? -rest : null;
   }
 
   // Valor planejado do mês (ignora status) — usado no painel do mês
@@ -342,6 +377,11 @@ const Store = (() => {
       for (const p of (l.items || [])) {
         if (p.status === "PAGO" && p.settledAt && (!anchorAt || p.settledAt > anchorAt)) s += (p.value || 0);
       }
+    }
+    // Faturas de cartão pagas depois da âncora saem do saldo (o dinheiro saiu da conta).
+    for (const k in (state.faturasPagas || {})) {
+      const p = state.faturasPagas[k];
+      if (p && p.value != null && p.at && (!anchorAt || p.at > anchorAt)) s -= p.value;
     }
     return Math.round(s * 100) / 100;
   }
@@ -699,6 +739,7 @@ const Store = (() => {
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas,
+    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
