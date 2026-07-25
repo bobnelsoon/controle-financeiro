@@ -5,8 +5,9 @@ const ViewLancamentos = (() => {
   let mesSel = U.ymHoje();
 
   function abrirNovo() {
-    const cartoes = Store.state.accounts.filter(a => a.type === "cartao")
-      .map(a => `<option value="${a.id}">${U.esc(a.name)}</option>`).join("");
+    const cartoesArr = Store.state.accounts.filter(a => a.type === "cartao");
+    const cartoes = cartoesArr.map(a => `<option value="${a.id}">${U.esc(a.name)}</option>`).join("");
+    const faturaInicial = Store.faturaDaCompra(cartoesArr[0] && cartoesArr[0].id, U.hojeISO());
     UI.modal("Novo lançamento", `
       <label class="fld"><span>Descrição</span><input type="text" name="desc" required></label>
       <label class="fld"><span>Valor (R$)</span>
@@ -29,8 +30,8 @@ const ViewLancamentos = (() => {
       atualizam o <b>Saldo em conta</b> na hora: <b>Entrada</b> soma, <b>Saída</b> subtrai.</p>
       <div id="lanc-cartao-box" style="display:none">
         <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartoes}</select></label>
-        <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${U.ymAdd(U.ymHoje(), 1)}"></label>
-        <p class="muted" style="font-size:12px">Já vem preenchido com a <b>fatura do mês seguinte</b> (gasto de hoje é pago no próximo mês).
+        <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${faturaInicial}"></label>
+        <p class="muted" style="font-size:12px">A fatura segue o <b>dia de fechamento</b> do cartão (dá pra ajustar).
         A compra vai para a tela <b>Cartões</b> e o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho (parcelas caem nas próximas faturas).</p>
       </div>
       <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
@@ -96,6 +97,16 @@ const ViewLancamentos = (() => {
       document.getElementById("lanc-sign-box").style.display = ehCartao ? "none" : "";
       if (ehCartao) document.querySelector('input[name="sign"]').value = "-";
     });
+
+    // A fatura segue o fechamento do cartão escolhido e a data, salvo edição manual.
+    const selCartao = document.querySelector('#lanc-cartao-box select[name="cartao"]');
+    const dataLanc = document.querySelector('input[name="data"]');
+    const faturaLanc = document.querySelector('input[name="fatura"]');
+    let faturaEditada = false;
+    if (faturaLanc) faturaLanc.addEventListener("input", () => { faturaEditada = true; });
+    function recalcFaturaLanc() { if (faturaLanc && !faturaEditada) faturaLanc.value = Store.faturaDaCompra(selCartao ? selCartao.value : null, dataLanc ? dataLanc.value : null); }
+    if (selCartao) selCartao.addEventListener("change", recalcFaturaLanc);
+    if (dataLanc) dataLanc.addEventListener("change", recalcFaturaLanc);
   }
 
   function render(root) {

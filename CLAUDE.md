@@ -65,7 +65,11 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 ## Convenções de cálculo (decisões importantes — não quebrar)
 
 - **Fatura do cartão = identificada pelo mês em que é PAGA.** Gasto do mês atual entra na fatura do
-  **mês seguinte** (`ymAdd(ymHoje, 1)`). Por isso:
+  **mês seguinte** (`ymAdd(ymHoje, 1)`). **Com dia de fechamento** (`account.closingDay`, opcional):
+  `Store.faturaDaCompra(accountId, dataISO)` decide a fatura — compra **até** o fechamento → mês+1;
+  **depois** do fechamento → mês+2 (já entrou na fatura seguinte). Os forms de compra (Cartões,
+  Lançamentos, abastecimento no cartão) pré-preenchem "Fatura de" com isso e recalculam ao trocar
+  cartão/data (respeitando edição manual). Por isso:
   - nova compra (Lançamentos/Cartões) já vem com a fatura do próximo mês;
   - a aba Cartões abre na **fatura vigente** (mês seguinte);
   - o dashboard mostra "fatura de <mês seguinte> (gastos de <mês atual>)".

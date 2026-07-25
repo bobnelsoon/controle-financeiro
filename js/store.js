@@ -210,6 +210,19 @@ const Store = (() => {
   function faturaTotal(ymStr, accountId) {
     return cardTxDoMes(ymStr, accountId).reduce((s, t) => s + t.value, 0);
   }
+  // Em qual fatura (mês de pagamento) uma compra cai, considerando o dia de FECHAMENTO do cartão.
+  // Regra: compra até o dia de fechamento → fatura do mês seguinte; DEPOIS do fechamento → fatura
+  // dali a dois meses (já entrou na fatura seguinte). Sem dia de fechamento, cai no padrão (mês+1).
+  function faturaDaCompra(accountId, dataISO) {
+    const acc = (state.accounts || []).find(a => a.id === accountId);
+    const base = dataISO && /^\d{4}-\d{2}-\d{2}$/.test(dataISO) ? dataISO : U.hojeISO();
+    const ym = base.slice(0, 7);
+    const dia = Number(base.slice(8, 10));
+    const fech = acc && acc.closingDay ? Number(acc.closingDay) : null;
+    if (fech && dia > fech) return U.ymAdd(ym, 2);
+    return U.ymAdd(ym, 1);
+  }
+
   function addCardTx(tx) { state.cardTx.push(tx); save(); }
   function removeCardTx(id) { state.cardTx = state.cardTx.filter(t => t.id !== id); save(); }
   function removeCardTxIds(ids) { const set = new Set(ids); state.cardTx = (state.cardTx || []).filter(t => !set.has(t.id)); save(); }
@@ -738,7 +751,7 @@ const Store = (() => {
     monthTotal, saldoAcumuladoAte, saldoSerie, saldoProjecaoSerie, saldoContaAtual, contaAncoraYm,
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
-    cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas,
+    cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
     despesasPorCategoria, catName, accName,

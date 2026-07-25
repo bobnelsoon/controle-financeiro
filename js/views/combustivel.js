@@ -23,7 +23,7 @@ const ViewCombustivel = (() => {
     const tipoOpts = TIPOS.map(([v, l]) => `<option value="${v}" ${e.fuelType === v ? "selected" : ""}>${l}</option>`).join("");
     const cartoes = Store.state.accounts.filter(a => a.type === "cartao");
     const linked = (e.linkCardTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkCardTxId) : null;
-    const faturaDefault = linked ? linked.ym : U.ymAdd((e.date || U.hojeISO()).slice(0, 7), 1);
+    const faturaDefault = linked ? linked.ym : Store.faturaDaCompra(e.cardId || (cartoes[0] && cartoes[0].id), e.date || U.hojeISO());
     const cartaoOpts = cartoes.map(a => `<option value="${a.id}" ${e.cardId === a.id ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
     const ehCartao = e.payment === "cartao";
 
