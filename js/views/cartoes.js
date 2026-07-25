@@ -11,14 +11,21 @@ const ViewCartoes = (() => {
     acc = acc || { id: U.id(), name: "", type: "cartao", dueDay: null, limit: null };
     UI.modal(isNew ? "Novo cartão/conta" : "Editar " + acc.name, `
       <label class="fld"><span>Nome</span><input type="text" name="nome" value="${U.esc(acc.name)}" required></label>
-      <label class="fld"><span>Dia do vencimento da fatura</span>
-        <input type="number" name="dia" min="1" max="31" value="${acc.dueDay ?? ""}"></label>
+      <div class="fld-2">
+        <label class="fld"><span>Dia de fechamento</span>
+          <input type="number" name="fechamento" min="1" max="31" value="${acc.closingDay ?? ""}" placeholder="ex.: 30"></label>
+        <label class="fld"><span>Dia do vencimento</span>
+          <input type="number" name="dia" min="1" max="31" value="${acc.dueDay ?? ""}"></label>
+      </div>
+      <p class="muted" style="font-size:12px">Compras feitas <b>depois</b> do dia de fechamento já entram na
+      <b>fatura seguinte</b> automaticamente. Deixe o fechamento em branco se não quiser usar.</p>
       <label class="fld"><span>Limite (R$, opcional)</span>
         <input type="text" name="limite" value="${acc.limit != null ? String(acc.limit).replace(".", ",") : ""}" inputmode="decimal"></label>
     `, (form) => {
       acc.name = form.nome.value.trim();
       if (!acc.name) return false;
       acc.dueDay = form.dia.value ? Number(form.dia.value) : null;
+      acc.closingDay = form.fechamento.value ? Number(form.fechamento.value) : null;
       acc.limit = U.parseMoney(form.limite.value);
       if (isNew) Store.state.accounts.push(acc);
       Store.save();
@@ -29,15 +36,19 @@ const ViewCartoes = (() => {
   function abrirNovaCompra(accountId) {
     const contas = Store.state.accounts.map(a =>
       `<option value="${a.id}" ${a.id === accountId ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
-    UI.modal("Nova compra no cartão", `
+    const contaInicial = accountId || (Store.state.accounts[0] && Store.state.accounts[0].id);
+    const faturaInicial = Store.faturaDaCompra(contaInicial, U.hojeISO());
+    const ov = UI.modal("Nova compra no cartão", `
       <label class="fld"><span>Cartão</span><select name="conta">${contas}</select></label>
       <label class="fld"><span>Descrição</span><input type="text" name="desc" required placeholder="ex.: mercado, posto..."></label>
       <label class="fld"><span>Valor total da compra (R$)</span>
         <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00"></label>
-      <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
-      <label class="fld"><span>Fatura de</span><input type="month" name="fatura" value="${mesSel}"></label>
-      <label class="fld"><span>Data da compra (opcional)</span><input type="date" name="data" value="${U.hojeISO()}"></label>
-      <p class="muted" style="font-size:12px">Compras parceladas entram automaticamente nas próximas faturas, e o item "Cartão (fatura)" do Fluxo Anual é atualizado sozinho.</p>
+      <div class="fld-2">
+        <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
+        <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
+      </div>
+      <label class="fld"><span>Fatura de</span><input type="month" name="fatura" value="${faturaInicial}"></label>
+      <p class="muted" style="font-size:12px" id="compra-nota-fatura">A fatura é escolhida automaticamente pelo <b>dia de fechamento</b> do cartão (dá pra ajustar). Parcelas caem nas faturas seguintes; o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho.</p>
     `, (form) => {
       const total = U.parseMoney(form.valor.value);
       if (total == null || !form.desc.value.trim()) return false;
@@ -59,6 +70,17 @@ const ViewCartoes = (() => {
       }
       App.render();
     });
+
+    // A "Fatura de" segue o dia de fechamento do cartão escolhido e a data da compra,
+    // a menos que o usuário edite o campo manualmente.
+    const contaSel = ov.querySelector('select[name="conta"]');
+    const dataEl = ov.querySelector('input[name="data"]');
+    const faturaEl = ov.querySelector('input[name="fatura"]');
+    let faturaEditada = false;
+    faturaEl.addEventListener("input", () => { faturaEditada = true; });
+    function recalcFatura() { if (!faturaEditada) faturaEl.value = Store.faturaDaCompra(contaSel.value, dataEl.value); }
+    contaSel.addEventListener("change", recalcFatura);
+    dataEl.addEventListener("change", recalcFatura);
   }
 
   function render(root) {
@@ -109,7 +131,7 @@ const ViewCartoes = (() => {
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
             <div>
               <b style="font-size:15px">💳 ${U.esc(a.name)}</b>
-              <span class="muted" style="font-size:12px">${a.dueDay ? " · vence dia " + a.dueDay : ""}</span>
+              <span class="muted" style="font-size:12px">${a.closingDay ? " · fecha dia " + a.closingDay : ""}${a.dueDay ? " · vence dia " + a.dueDay : ""}</span>
             </div>
             <div class="row-gap">
               <span class="tag num">Fatura ${U.ymLabel(mesSel)}: <b>${U.brl(fatura)}</b></span>
