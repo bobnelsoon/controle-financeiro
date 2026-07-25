@@ -209,10 +209,23 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO**: a `v19` / cache `202607192000` foi para a `main` (PR → merge) e está no ar pelo GitHub Pages.
-O app virou **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial
-lançadora. O usuário vai validar o funcionamento online. Próximas melhorias entram na mesma branch
-`claude/project-updates-2r7rf9` (reiniciada a partir da `main` após o merge) → novo PR → merge.
+**PUBLICADO** (linha `v19`, cache atual `202607192700`): tudo no ar pela `main`/GitHub Pages. O app é o
+**Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
+Publicação por PR → merge (PRs #14–#21 mesclados nesta iteração). Próximas melhorias na mesma branch
+`claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
+O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+Adicionado depois da v19 inicial (tudo publicado e validado em headless; **nada de dado real versionado**):
+- **Combustível — Dashboard** (previsão do próximo mês + gráfico de gasto/mês + comparador), **pagamento no
+  cartão** no abastecimento, **soma automática** do total (preço×litros) e **importar completo**
+  `{vehicle, maintenance, entries}`.
+- **Investimentos — 📥 Importar** (`ViewInvestimentos.abrirImportar`): cola JSON de ativos/renda fixa.
+- **Cartões — pagar fatura por cartão** (`faturasPagas`, `Store.pagarFatura`): sai do "a pagar" e do saldo;
+  **dia de fechamento** por cartão (`account.closingDay` + `Store.faturaDaCompra`) escolhe a fatura da compra.
+- **UI mobile**: marca vira só o ícone 💼, Adicionar sai do topo (vira **FAB** flutuante), botões compactos —
+  mais espaço para as abas.
+- **Sync corrigido**: abrir o app **não** conta como alteração (`loadingState` no `Store.save`), então o
+  aparelho recém-aberto **puxa** a versão mais nova do cofre em vez de sobrescrever com dados velhos.
 
 No ar (v19), validado em headless com os dados reais do usuário (**nada de dado real foi versionado**):
 - **Tela inicial (lançador)** `ViewInicio`: o app **abre sempre nela** com 4 botões — Financeiro, Combustível,
