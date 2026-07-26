@@ -125,7 +125,10 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   verde/vermelho) usam `avgPrice` vs cotação atual; ficam "—" enquanto o preço pago não é informado.
   A aba tem **📥 Importar** (`ViewInvestimentos.abrirImportar`): cola JSON — lista de ativos
   `[{ticker, type, qty, avgPrice}]` ou objeto `{assets, fixed}` (renda fixa junto). Atualiza pelo ticker
-  (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii).
+  (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii). Coluna
+  **"Preço médio"** (era "Preço pago"). Botão **"＋ aporte"** por ativo (`ViewInvestimentos.abrirAporte`):
+  registra uma nova compra (qtd + preço desta compra) e recalcula a **média ponderada**, com prévia ao vivo
+  do novo preço médio.
   No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
   (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
   Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI

@@ -70,6 +70,44 @@ const ViewInvestimentos = (() => {
     });
   }
 
+  // Registrar uma NOVA compra (aporte) de um ativo existente: soma a quantidade e recalcula o
+  // preço médio ponderado. Mostra a prévia do novo preço médio ao vivo enquanto digita.
+  function abrirAporte(a) {
+    const ov = UI.modal("Nova compra de " + a.ticker, `
+      <p class="muted" style="font-size:12.5px;margin-top:0">Posição atual: <b>${a.qty}</b> cota(s) · preço médio <b>${a.avgPrice != null ? U.brl(a.avgPrice) : "—"}</b></p>
+      <div class="fld-2">
+        <label class="fld"><span>Quantidade comprada agora</span>
+          <input type="number" name="qty" min="1" step="1" value="1" required></label>
+        <label class="fld"><span>Preço pago por cota (R$)</span>
+          <input type="text" name="preco" inputmode="decimal" required placeholder="ex.: 98,50"></label>
+      </div>
+      <div id="ap-previa" class="muted" style="font-size:12.5px"></div>
+    `, (form) => {
+      const qty = Number(form.qty.value);
+      const preco = U.parseMoney(form.preco.value);
+      if (!qty || qty <= 0 || preco == null) return false;
+      const antigo = a.avgPrice != null ? a.avgPrice : preco;
+      a.avgPrice = Math.round(((antigo * a.qty + preco * qty) / (a.qty + qty)) * 100) / 100;
+      a.qty += qty;
+      Store.save();
+      App.render();
+      atualizarCotacoes();
+    });
+    const qtyEl = ov.querySelector('input[name="qty"]');
+    const precoEl = ov.querySelector('input[name="preco"]');
+    const prev = ov.querySelector("#ap-previa");
+    function calc() {
+      const qty = Number(qtyEl.value);
+      const preco = U.parseMoney(precoEl.value);
+      if (!qty || qty <= 0 || preco == null) { prev.innerHTML = ""; return; }
+      const antigo = a.avgPrice != null ? a.avgPrice : preco;
+      const novoAvg = Math.round(((antigo * a.qty + preco * qty) / (a.qty + qty)) * 100) / 100;
+      prev.innerHTML = `Depois desta compra: <b>${a.qty + qty}</b> cota(s) · novo preço médio <b class="pos">${U.brl(novoAvg)}</b> (era ${a.avgPrice != null ? U.brl(a.avgPrice) : "—"})`;
+    }
+    qtyEl.addEventListener("input", calc);
+    precoEl.addEventListener("input", calc);
+  }
+
   function abrirEditarAtivo(a) {
     UI.modal("Editar " + a.ticker, `
       <label class="fld"><span>Quantidade de cotas</span>
@@ -213,7 +251,7 @@ const ViewInvestimentos = (() => {
           </div>
         </div>
         <table class="tbl tbl-wide mt">
-          <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço pago</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
+          <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço médio</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
           <tbody id="rv-body"></tbody>
         </table>
       </div>
@@ -266,10 +304,12 @@ const ViewInvestimentos = (() => {
           <td class="num ${ganhoCls}">${ganhoTxt}</td>
           <td class="num"><b>${totalAtivo != null ? U.brl(totalAtivo) : "—"}</b></td>
           <td style="white-space:nowrap">
+            <button class="btn-sm ap btn-pay" title="Registrar nova compra (aporte)">＋ aporte</button>
             <button class="btn-sm ed" title="Editar ativo">✎</button>
             <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
           </td>
         </tr>`);
+      tr.querySelector(".ap").addEventListener("click", () => abrirAporte(a));
       tr.querySelector(".ed").addEventListener("click", () => abrirEditarAtivo(a));
       tr.querySelector(".rm").addEventListener("click", () => {
         UI.confirmar(`Remover ${a.ticker} da carteira?`, () => {
