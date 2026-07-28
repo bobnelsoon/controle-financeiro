@@ -517,29 +517,43 @@ const Store = (() => {
     save();
   }
 
-  // Dividendos: guarda o último dividendo por cota de cada ativo ({ ticker: {value, payDate, updatedAt} }).
+  // Dividendos: guarda o histórico por cota de cada ativo ({ ticker: {list:[{value,payDate}], updatedAt} }).
   function saveDividends(mapa) {
     if (!inv().dividends) inv().dividends = {};
     Object.assign(inv().dividends, mapa);
     save();
   }
-  // Resumo: por ativo o último dividendo (valor/cota × cotas) + total e yield sobre o patrimônio em RV.
-  function dividendosResumo() {
+  // Mês a partir do qual contamos os dividendos (o usuário comprou as cotas). Padrão: início do ano atual.
+  function divSince() {
+    return (inv().divSince) || (U.ymHoje().slice(0, 4) + "-01");
+  }
+  function setDivSince(ym) { inv().divSince = ym; save(); }
+
+  // Resumo: por ativo, SOMA de todos os dividendos por cota pagos a partir de `desde` (× cotas),
+  // + total da carteira e yield sobre o patrimônio em RV.
+  function dividendosResumo(desde) {
     const divs = inv().dividends || {};
+    const since = desde || divSince();
     const linhas = [];
     let total = 0;
+    let ultimoDisponivel = null;
     for (const a of inv().assets) {
       const d = divs[a.ticker];
-      if (!d || d.value == null) continue;
-      const t = Math.round(d.value * a.qty * 100) / 100;
+      if (!d) continue;
+      const list = d.list || (d.value != null ? [{ value: d.value, payDate: d.payDate }] : []);
+      for (const x of list) { if (x.payDate && (!ultimoDisponivel || x.payDate > ultimoDisponivel)) ultimoDisponivel = x.payDate; }
+      const itens = list.filter(x => x.value != null && x.payDate && x.payDate.slice(0, 7) >= since);
+      if (!itens.length) continue;
+      const perCota = Math.round(itens.reduce((s, x) => s + x.value, 0) * 1e6) / 1e6;
+      const t = Math.round(perCota * a.qty * 100) / 100;
       total += t;
-      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, perCota: d.value, total: t, payDate: d.payDate || null });
+      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, perCota, total: t, n: itens.length, ultimoPay: itens[itens.length - 1].payDate });
     }
     total = Math.round(total * 100) / 100;
     const patr = rvTotal();
     const yieldPct = patr > 0 ? (total / patr) * 100 : null;
     linhas.sort((a, b) => b.total - a.total);
-    return { linhas, total, yieldPct };
+    return { linhas, total, yieldPct, since, ultimoDisponivel };
   }
 
   // Aportes do ano: soma do item de fluxo cujo nome contém "invest" (valores negativos = dinheiro aplicado)
@@ -780,7 +794,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,

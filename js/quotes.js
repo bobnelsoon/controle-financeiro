@@ -78,8 +78,8 @@ const Quotes = (() => {
     return { ok, falhas };
   }
 
-  // Último dividendo por cota (mfinance): devolve { value, payDate }. FIIs em /fiis/dividends,
-  // ações em /stocks/dividends. Pega o registro mais recente pela data de pagamento.
+  // Histórico de dividendos por cota (mfinance): devolve { list: [{value, payDate}] } com TODOS os
+  // pagamentos (últimos ~48). FIIs em /fiis/dividends, ações em /stocks/dividends.
   async function fetchDividend(ticker) {
     const bases = ticker.match(/11B?$/) ? ["fiis", "stocks"] : ["stocks", "fiis"];
     let ultimoErro = null;
@@ -90,11 +90,12 @@ const Quotes = (() => {
         const j = await r.json();
         const arr = j && j.dividends;
         if (Array.isArray(arr) && arr.length) {
-          const ult = arr.reduce((a, b) => {
-            const da = new Date(a.payDate || a.declaredDate || 0), db = new Date(b.payDate || b.declaredDate || 0);
-            return db >= da ? b : a;
-          });
-          if (ult && ult.value != null) return { value: ult.value, payDate: ult.payDate || ult.declaredDate || null, updatedAt: Date.now() };
+          const list = arr
+            .filter(x => x.value != null && (x.payDate || x.declaredDate))
+            .map(x => ({ value: x.value, payDate: (x.payDate || x.declaredDate).slice(0, 10) }))
+            .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
+            .slice(-48); // no máximo ~4 anos, para não inflar o backup
+          if (list.length) return { list, updatedAt: Date.now() };
         }
         ultimoErro = new Error("sem dividendos");
       } catch (e) { ultimoErro = e; }
