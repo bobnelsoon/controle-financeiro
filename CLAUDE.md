@@ -29,9 +29,11 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/utils.js` — `U`: formatação (BRL, datas), helpers de mês (`ym`, `ymAdd`, `ymParse`), DOM (`el`, `esc`).
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
-- `js/quotes.js` — `Quotes`: cotações de ações/FIIs (mfinance → brapi → Yahoo) + **dividendos**
-  (`fetchDividend`/`fetchDividendsAll` via mfinance `/{fiis|stocks}/dividends/{ticker}` — devolve o **histórico**
-  `list:[{value,payDate}]`, últimos ~48). mfinance já traz TODOS os pagamentos; pode atrasar meses recentes.
+- `js/quotes.js` — `Quotes`: cotações de ações/FIIs. **Fonte principal: HG Brasil** (`viaHGMany`, chave
+  exposta `HG_KEY` restrita ao domínio `bobnelsoon.github.io` — uma chamada traz vários símbolos, economiza
+  cota); reservas: mfinance → brapi → Yahoo (`fetchQuoteReserva`). **Dividendos** por mfinance
+  (`fetchDividend`/`fetchDividendsAll` via `/{fiis|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`,
+  últimos ~48; o HG finance não expõe dividendos). A `HG_KEY` é browser+domain-locked, por isso fica no código.
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
   como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
   `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
