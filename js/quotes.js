@@ -10,35 +10,50 @@ const Quotes = (() => {
   // do tipo browser + domain-locked, pode ficar no código (só funciona a partir do site do usuário).
   const HG_KEY = "c0f5c4be";
 
-  // ---------- brapi.dev (principal): cotação + dividendos numa chamada só ----------
-  // Aceita vários tickers separados por vírgula. Com `dividends=true` vem o histórico de proventos.
-  async function viaBrapiFull(tickers, token) {
-    if (!tickers.length) return { quotes: {}, dividends: {} };
-    const url = `https://brapi.dev/api/quote/${encodeURIComponent(tickers.join(","))}?dividends=true` +
+  // ---------- brapi.dev (principal): cotação + dividendos por cota ----------
+  // IMPORTANTE: no plano GRATUITO do brapi cada chamada aceita só UM ticker (o multi-ticker por
+  // vírgula é do plano pago e faz a chamada inteira falhar). Por isso buscamos um ticker por vez,
+  // em paralelo — assim funciona no grátis e um ticker que falha não derruba os outros.
+  function parseBrapiCash(q) {
+    const cash = q.dividendsData && q.dividendsData.cashDividends;
+    if (!Array.isArray(cash) || !cash.length) return null;
+    const list = cash
+      .filter(x => x.rate != null && x.paymentDate)
+      .map(x => ({ value: Number(x.rate), payDate: String(x.paymentDate).slice(0, 10) }))
+      .filter(x => !isNaN(x.value) && x.payDate)
+      .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
+      .slice(-48); // no máximo ~4 anos, para não inflar o backup
+    return list.length ? { list, source: "brapi", updatedAt: Date.now() } : null;
+  }
+
+  async function viaBrapiOne(ticker, token) {
+    const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?dividends=true` +
       (token ? `&token=${encodeURIComponent(token)}` : "");
     const r = await fetch(url);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
-    const results = (j && j.results) || [];
-    const quotes = {}, dividends = {};
-    for (const q of results) {
-      const t = q && q.symbol;
-      if (!t) continue;
-      if (q.regularMarketPrice != null) {
-        const prev = q.regularMarketPreviousClose != null ? q.regularMarketPreviousClose : q.regularMarketPrice;
-        quotes[t] = { price: q.regularMarketPrice, prevClose: prev, name: q.longName || q.shortName || t, updatedAt: Date.now() };
-      }
-      const cash = q.dividendsData && q.dividendsData.cashDividends;
-      if (Array.isArray(cash) && cash.length) {
-        const list = cash
-          .filter(x => x.rate != null && x.paymentDate)
-          .map(x => ({ value: Number(x.rate), payDate: String(x.paymentDate).slice(0, 10) }))
-          .filter(x => !isNaN(x.value) && x.payDate)
-          .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
-          .slice(-48); // no máximo ~4 anos, para não inflar o backup
-        if (list.length) dividends[t] = { list, updatedAt: Date.now() };
-      }
+    const q = j && j.results && j.results[0];
+    if (!q) throw new Error(j && j.message ? j.message : "sem dados");
+    const out = { quote: null, dividends: null };
+    if (q.regularMarketPrice != null) {
+      const prev = q.regularMarketPreviousClose != null ? q.regularMarketPreviousClose : q.regularMarketPrice;
+      out.quote = { price: q.regularMarketPrice, prevClose: prev, name: q.longName || q.shortName || ticker, source: "brapi", updatedAt: Date.now() };
     }
+    out.dividends = parseBrapiCash(q);
+    return out;
+  }
+
+  // Busca cada ticker individualmente (paralelo) e junta cotação + dividendos.
+  async function viaBrapiFull(tickers, token) {
+    const quotes = {}, dividends = {};
+    if (!tickers.length) return { quotes, dividends };
+    const res = await Promise.allSettled(tickers.map(t => viaBrapiOne(t, token)));
+    tickers.forEach((t, i) => {
+      if (res[i].status === "fulfilled") {
+        if (res[i].value.quote) quotes[t] = res[i].value.quote;
+        if (res[i].value.dividends) dividends[t] = res[i].value.dividends;
+      }
+    });
     return { quotes, dividends };
   }
 
@@ -57,7 +72,7 @@ const Quotes = (() => {
         if (q && q.price != null && !q.error) {
           const chg = Number(q.change_percent);
           const prevClose = (!isNaN(chg) && (1 + chg / 100) !== 0) ? q.price / (1 + chg / 100) : q.price;
-          out[t] = { price: q.price, prevClose, name: q.name || t, updatedAt: Date.now() };
+          out[t] = { price: q.price, prevClose, name: q.name || t, source: "hg", updatedAt: Date.now() };
         }
       }
     }
@@ -80,6 +95,7 @@ const Quotes = (() => {
             price: j.lastPrice,
             prevClose: j.closingPrice != null ? j.closingPrice : j.lastPrice,
             name: j.name || ticker,
+            source: "mfinance",
             updatedAt: Date.now()
           };
         }
@@ -107,6 +123,7 @@ const Quotes = (() => {
       price: m.regularMarketPrice,
       prevClose: m.previousClose != null ? m.previousClose : m.chartPreviousClose,
       name: m.longName || m.shortName || ticker,
+      source: "yahoo",
       updatedAt: Date.now()
     };
   }
@@ -186,7 +203,7 @@ const Quotes = (() => {
             .map(x => ({ value: x.value, payDate: (x.payDate || x.declaredDate).slice(0, 10) }))
             .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
             .slice(-48); // no máximo ~4 anos, para não inflar o backup
-          if (list.length) return { list, updatedAt: Date.now() };
+          if (list.length) return { list, source: "mfinance", updatedAt: Date.now() };
         }
         ultimoErro = new Error("sem dividendos");
       } catch (e) { ultimoErro = e; }

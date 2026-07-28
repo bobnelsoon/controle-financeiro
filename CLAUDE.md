@@ -30,9 +30,12 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
 - `js/quotes.js` — `Quotes`: cotações de ações/FIIs **e dividendos**. **Fonte principal: brapi.dev**
-  (`viaBrapiFull(tickers, token)` — vários símbolos + `dividends=true` numa chamada só: cotação em
-  `results[].regularMarketPrice`/`regularMarketPreviousClose`/`longName` e dividendos em
-  `results[].dividendsData.cashDividends[]` → `{value: rate, payDate: paymentDate}`). O **token do brapi**
+  (`viaBrapiFull(tickers, token)` — **um ticker por chamada, em paralelo** (`viaBrapiOne`), porque o
+  multi-ticker por vírgula é do plano PAGO e faz a chamada inteira falhar no grátis; `dividends=true` traz
+  cotação em `results[0].regularMarketPrice`/`regularMarketPreviousClose`/`longName` e dividendos em
+  `results[0].dividendsData.cashDividends[]` → `{value: rate, payDate: paymentDate}`). Cada cotação/dividendo
+  carrega um `source` (`brapi`/`hg`/`mfinance`/`yahoo`) exibido na tela Investimentos (`fontesLabel` → "via
+  brapi"). O **token do brapi**
   NÃO é travado por domínio (credencial pessoal), então **NÃO fica no código**: vive em
   `state.settings.brapiToken` (setado em Configurações, sincroniza privado pelo Gist) e é lido por
   `Store.brapiToken()`. `fetchAll(tickers, token)` devolve `{ ok, falhas, dividends }`: tenta brapi (cota +
