@@ -43,17 +43,37 @@ const Quotes = (() => {
     return out;
   }
 
-  // Busca cada ticker individualmente (paralelo) e junta cotação + dividendos.
+  // Executa `fn` sobre os itens com no máximo `limit` em paralelo (para não estourar o limite de
+  // requisições/minuto do plano grátis do brapi, que derrubaria parte dos tickers).
+  async function mapLimit(items, limit, fn) {
+    const results = new Array(items.length);
+    let i = 0;
+    async function worker() {
+      while (i < items.length) { const idx = i++; results[idx] = await fn(items[idx], idx); }
+    }
+    const n = Math.min(limit, items.length);
+    await Promise.all(Array.from({ length: n }, worker));
+    return results;
+  }
+
+  // Busca cada ticker individualmente, no máximo 3 por vez, com UMA nova tentativa após uma pausa
+  // (o plano grátis limita requisições por minuto — a 2ª tentativa recupera os que tomaram 429).
   async function viaBrapiFull(tickers, token) {
     const quotes = {}, dividends = {};
     if (!tickers.length) return { quotes, dividends };
-    const res = await Promise.allSettled(tickers.map(t => viaBrapiOne(t, token)));
-    tickers.forEach((t, i) => {
-      if (res[i].status === "fulfilled") {
-        if (res[i].value.quote) quotes[t] = res[i].value.quote;
-        if (res[i].value.dividends) dividends[t] = res[i].value.dividends;
+    const res = await mapLimit(tickers, 3, async (t) => {
+      try { return { t, v: await viaBrapiOne(t, token) }; }
+      catch (e) {
+        try { await new Promise(r => setTimeout(r, 700)); return { t, v: await viaBrapiOne(t, token) }; }
+        catch (e2) { return { t, v: null }; }
       }
     });
+    for (const r of res) {
+      if (r && r.v) {
+        if (r.v.quote) quotes[r.t] = r.v.quote;
+        if (r.v.dividends) dividends[r.t] = r.v.dividends;
+      }
+    }
     return { quotes, dividends };
   }
 
