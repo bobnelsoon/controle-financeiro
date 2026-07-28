@@ -29,7 +29,8 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/utils.js` — `U`: formatação (BRL, datas), helpers de mês (`ym`, `ymAdd`, `ymParse`), DOM (`el`, `esc`).
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
-- `js/quotes.js` — `Quotes`: cotações de ações/FIIs (mfinance → brapi → Yahoo).
+- `js/quotes.js` — `Quotes`: cotações de ações/FIIs (mfinance → brapi → Yahoo) + **dividendos**
+  (`fetchDividend`/`fetchDividendsAll` via mfinance `/{fiis|stocks}/dividends/{ticker}`, pega o último por cota).
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
   como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
   `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
@@ -128,7 +129,10 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii). Coluna
   **"Preço médio"** (era "Preço pago"). Botão **"＋ aporte"** por ativo (`ViewInvestimentos.abrirAporte`):
   registra uma nova compra (qtd + preço desta compra) e recalcula a **média ponderada**, com prévia ao vivo
-  do novo preço médio.
+  do novo preço médio. O KPI **"Ações e FIIs"** (redundante com Patrimônio) virou **"📈 Rentabilidade"**
+  (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos (último por cota)"**: `state.investments.dividends`
+  (`{ticker:{value,payDate}}`) buscado junto com as cotações em `atualizarCotacoes`; `Store.dividendosResumo`
+  soma `valor/cota × cotas` por ativo + yield sobre o patrimônio. **Só informativo** (não entra no fluxo).
   No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
   (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
   Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI
