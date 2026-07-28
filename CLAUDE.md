@@ -232,18 +232,25 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607192700`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607193300`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#21 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#28 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
 
-Em andamento nesta branch (validado em headless, cache `202607193200`, **ainda não mesclado** enquanto escrevo):
-- **Cotações + dividendos pela brapi.dev** (`viaBrapiFull`): uma chamada traz cotação e dividendos por cota.
-  O **token do brapi** fica em **Configurações → 📈 Cotações e dividendos (brapi)** (`state.settings.brapiToken`,
+**Cotações + dividendos pela brapi.dev** (PUBLICADO, cache `202607193300`, PRs #27 e #28):
+- `viaBrapiFull` busca **um ticker por chamada, em paralelo** (`viaBrapiOne`) — o multi-ticker por vírgula é
+  do plano PAGO do brapi e faz a chamada inteira falhar no grátis (era o bug: caía na HG p/ cotação e mfinance
+  p/ dividendos, que trava em fev/2026). `dividends=true` traz cotação + `dividendsData.cashDividends` numa só
+  chamada por ativo. Cada cotação/dividendo carrega `source` (`brapi`/`hg`/`mfinance`/`yahoo`), exibido na tela
+  Investimentos (`fontesLabel` → "cotações: … · via brapi" e "💰 Dividendos recebidos (via brapi)").
+- O **token do brapi** fica em **Configurações → 📈 Cotações e dividendos (brapi)** (`state.settings.brapiToken`,
   via `Store.setBrapiToken`/`brapiToken`), sincroniza privado pelo Gist — **NÃO** vai hardcoded no repo (não é
   domain-locked como a chave HG). Fallbacks: HG/mfinance/Yahoo p/ cotação, mfinance p/ dividendos que faltarem.
-  ⚠️ O usuário precisa **colar o token uma vez** em Configurações (depois sincroniza para todos os aparelhos).
+  ⚠️ O usuário colou o token em Configurações (sincroniza para todos os aparelhos).
+- ⚠️ **Não testável ao vivo pelo agente** (a rede do ambiente bloqueia brapi.dev/APIs de finanças — `HTTP 000`);
+  validação só em headless com respostas simuladas. Se voltar a aparecer "via HG"/"via mfinance" ou algum ativo
+  sem dividendo, investigar limite de requisições do plano grátis do brapi ou ticker específico.
 
 Adicionado depois da v19 inicial (tudo publicado e validado em headless; **nada de dado real versionado**):
 - **Combustível — Dashboard** (previsão do próximo mês + gráfico de gasto/mês + comparador), **pagamento no
