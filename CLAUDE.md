@@ -29,11 +29,19 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/utils.js` — `U`: formatação (BRL, datas), helpers de mês (`ym`, `ymAdd`, `ymParse`), DOM (`el`, `esc`).
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
-- `js/quotes.js` — `Quotes`: cotações de ações/FIIs. **Fonte principal: HG Brasil** (`viaHGMany`, chave
-  exposta `HG_KEY` restrita ao domínio `bobnelsoon.github.io` — uma chamada traz vários símbolos, economiza
-  cota); reservas: mfinance → brapi → Yahoo (`fetchQuoteReserva`). **Dividendos** por mfinance
-  (`fetchDividend`/`fetchDividendsAll` via `/{fiis|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`,
-  últimos ~48; o HG finance não expõe dividendos). A `HG_KEY` é browser+domain-locked, por isso fica no código.
+- `js/quotes.js` — `Quotes`: cotações de ações/FIIs **e dividendos**. **Fonte principal: brapi.dev**
+  (`viaBrapiFull(tickers, token)` — vários símbolos + `dividends=true` numa chamada só: cotação em
+  `results[].regularMarketPrice`/`regularMarketPreviousClose`/`longName` e dividendos em
+  `results[].dividendsData.cashDividends[]` → `{value: rate, payDate: paymentDate}`). O **token do brapi**
+  NÃO é travado por domínio (credencial pessoal), então **NÃO fica no código**: vive em
+  `state.settings.brapiToken` (setado em Configurações, sincroniza privado pelo Gist) e é lido por
+  `Store.brapiToken()`. `fetchAll(tickers, token)` devolve `{ ok, falhas, dividends }`: tenta brapi (cota +
+  dividendos), depois **HG Brasil** em lote (`viaHGMany`, chave exposta `HG_KEY` browser+domain-locked em
+  `bobnelsoon.github.io` — essa pode ficar no código) para o que faltar de cotação, e por fim reservas
+  individuais (mfinance → Yahoo). **Reserva de dividendos: mfinance** (`fetchDividend`/`fetchDividendsAll`
+  via `/{fiis|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`, últimos ~48), usada só para
+  os ativos que o brapi não trouxe (ex.: sem token). `ViewInvestimentos.atualizarCotacoes` salva `saveQuotes`
+  + `saveDividends` da mesma chamada do brapi.
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
   como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
   `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
@@ -226,6 +234,13 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 Publicação por PR → merge (PRs #14–#21 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+Em andamento nesta branch (validado em headless, cache `202607193200`, **ainda não mesclado** enquanto escrevo):
+- **Cotações + dividendos pela brapi.dev** (`viaBrapiFull`): uma chamada traz cotação e dividendos por cota.
+  O **token do brapi** fica em **Configurações → 📈 Cotações e dividendos (brapi)** (`state.settings.brapiToken`,
+  via `Store.setBrapiToken`/`brapiToken`), sincroniza privado pelo Gist — **NÃO** vai hardcoded no repo (não é
+  domain-locked como a chave HG). Fallbacks: HG/mfinance/Yahoo p/ cotação, mfinance p/ dividendos que faltarem.
+  ⚠️ O usuário precisa **colar o token uma vez** em Configurações (depois sincroniza para todos os aparelhos).
 
 Adicionado depois da v19 inicial (tudo publicado e validado em headless; **nada de dado real versionado**):
 - **Combustível — Dashboard** (previsão do próximo mês + gráfico de gasto/mês + comparador), **pagamento no

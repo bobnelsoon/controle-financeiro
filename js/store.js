@@ -529,6 +529,13 @@ const Store = (() => {
   }
   function setDivSince(ym) { inv().divSince = ym; save(); }
 
+  // Token da API brapi.dev (cotações + dividendos). NÃO é travado por domínio — é uma credencial
+  // pessoal da conta do usuário, então NÃO fica no código público: vive nos dados (settings), que
+  // sincronizam de forma privada pelo Gist. O usuário cola uma vez em Configurações e vale em todos
+  // os aparelhos.
+  function brapiToken() { return (state.settings && state.settings.brapiToken) || ""; }
+  function setBrapiToken(t) { state.settings.brapiToken = (t || "").trim() || null; save(); }
+
   // Resumo: por ativo, SOMA de todos os dividendos por cota pagos a partir de `desde` (× cotas),
   // + total da carteira e yield sobre o patrimônio em RV.
   function dividendosResumo(desde) {
@@ -794,7 +801,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, brapiToken, setBrapiToken, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,

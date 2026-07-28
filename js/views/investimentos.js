@@ -25,12 +25,19 @@ const ViewInvestimentos = (() => {
     ultimaFalha = null;
     App.render();
     try {
-      const { ok, falhas } = await Quotes.fetchAll(tickers);
+      const token = Store.brapiToken();
+      // brapi traz cotação + dividendos numa chamada só (com o token das Configurações).
+      const { ok, falhas, dividends } = await Quotes.fetchAll(tickers, token);
       if (Object.keys(ok).length) Store.saveQuotes(ok);
+      if (dividends && Object.keys(dividends).length) Store.saveDividends(dividends);
       if (falhas.length) ultimaFalha = "Sem cotação para: " + falhas.join(", ");
       if (!Object.keys(ok).length && falhas.length) ultimaFalha = "Não foi possível buscar as cotações — verifique a internet.";
-      // Dividendos (não bloqueia se falhar) — busca o último por cota de cada ativo.
-      try { const dd = await Quotes.fetchDividendsAll(tickers); if (Object.keys(dd.ok).length) Store.saveDividends(dd.ok); } catch (e) {}
+      if (!token) ultimaFalha = (ultimaFalha ? ultimaFalha + " · " : "") + "Dica: cadastre o token do brapi em Configurações para cotações e dividendos mais completos.";
+      // Dividendos que o brapi não trouxe (sem token, ou ativo sem dados): tenta a reserva (mfinance).
+      const semDiv = tickers.filter(t => !dividends || !dividends[t]);
+      if (semDiv.length) {
+        try { const dd = await Quotes.fetchDividendsAll(semDiv); if (Object.keys(dd.ok).length) Store.saveDividends(dd.ok); } catch (e) {}
+      }
     } catch (e) {
       ultimaFalha = "Erro ao buscar cotações: " + e.message;
     }

@@ -32,6 +32,10 @@ const ViewConfig = (() => {
             <div id="sync-box"></div>
           </div>
           <div class="card mb">
+            <h2 class="section">📈 Cotações e dividendos (brapi)</h2>
+            <div id="brapi-box"></div>
+          </div>
+          <div class="card mb">
             <h2 class="section">Backup dos dados</h2>
             <p class="muted" style="font-size:12.5px">Os dados ficam salvos neste navegador. Exporte um backup de vez em quando (guarde no iCloud/OneDrive) e importe para restaurar ou trocar de computador.</p>
             <div class="row-gap">
@@ -102,6 +106,36 @@ const ViewConfig = (() => {
     });
 
     renderSync(root.querySelector("#sync-box"));
+    renderBrapi(root.querySelector("#brapi-box"));
+  }
+
+  // Token do brapi.dev — guardado nos dados (settings) e sincronizado de forma privada pelo cofre.
+  // Como NÃO é travado por domínio (é uma credencial da conta do usuário), NÃO fica no código público:
+  // cola uma vez aqui e vale em todos os aparelhos via sincronização.
+  function renderBrapi(box) {
+    const atual = Store.brapiToken();
+    box.innerHTML = `
+      <p class="muted" style="font-size:12.5px">As cotações e os dividendos dos seus ativos vêm da
+      <b>brapi.dev</b>. Crie um token grátis em <b>brapi.dev</b> (com a sua conta do GitHub) e cole abaixo.
+      Ele fica guardado nos <b>seus dados</b> e <b>sincroniza para todos os aparelhos</b> pelo cofre privado
+      — você cola uma vez só.</p>
+      <div class="row-gap">
+        <input type="password" id="brapi-token" placeholder="Cole aqui o token do brapi"
+          value="${U.esc(atual)}" style="flex:1">
+        <button class="btn-primary" id="btn-brapi-save">Salvar</button>
+        ${atual ? `<button class="btn-danger" id="btn-brapi-clear">Remover</button>` : ""}
+      </div>
+      <p id="brapi-status" class="muted" style="font-size:12px;margin-top:6px">${atual ? "✅ Token cadastrado." : "Sem token: o app usa fontes alternativas (podem ter menos dados de dividendos)."}</p>`;
+    box.querySelector("#btn-brapi-save").addEventListener("click", () => {
+      const t = box.querySelector("#brapi-token").value.trim();
+      Store.setBrapiToken(t);
+      App.render();
+    });
+    const btnClear = box.querySelector("#btn-brapi-clear");
+    if (btnClear) btnClear.addEventListener("click", () => {
+      Store.setBrapiToken("");
+      App.render();
+    });
   }
 
   function renderSync(box) {
