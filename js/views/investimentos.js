@@ -9,7 +9,7 @@ const ViewInvestimentos = (() => {
 
   const TIPOS_RF = ["CDB", "LCA", "LCI", "Tesouro Direto", "Poupança", "Cripto", "Outro"];
   const TIPO_LABEL = { fii: "FII", acao: "Ação" };
-  const FONTE_NOME = { brapi: "brapi", hg: "HG Brasil", mfinance: "mfinance", yahoo: "Yahoo" };
+  const FONTE_NOME = { brapi: "brapi", hg: "HG Brasil", mfinance: "mfinance", yahoo: "Yahoo", manual: "você" };
 
   // Resume as fontes de uma lista de dados (cotações/dividendos) num rótulo curto: "via brapi",
   // "via brapi + HG Brasil"... Ajuda a conferir de onde veio o dado.
@@ -124,6 +124,61 @@ const ViewInvestimentos = (() => {
     }
     qtyEl.addEventListener("input", calc);
     precoEl.addEventListener("input", calc);
+  }
+
+  // Lançar um dividendo recebido manualmente (o usuário registra assim que recebe). Guarda o valor
+  // POR COTA; aceita digitar o total recebido (deriva o por cota pela qtd). Permite ver/remover os
+  // lançamentos do ativo selecionado no mesmo modal.
+  function abrirLancarDividendo(tickerInicial) {
+    const assets = Store.inv().assets;
+    if (!assets.length) { UI.modal("Lançar dividendo", `<p class="empty">Você ainda não tem ativos na carteira.</p>`, () => true); return; }
+    const opts = assets.map(a => `<option value="${U.esc(a.ticker)}" ${a.ticker === tickerInicial ? "selected" : ""}>${U.esc(a.ticker)} (${a.qty} cotas)</option>`).join("");
+    const ov = UI.modal("Lançar dividendo recebido", `
+      <label class="fld"><span>Ativo</span><select name="ticker">${opts}</select></label>
+      <label class="fld"><span>Data do pagamento</span><input type="date" name="data" value="${U.hojeISO()}" max="${U.hojeISO()}"></label>
+      <div class="fld-2">
+        <label class="fld"><span>Valor por cota (R$)</span><input type="text" name="porCota" inputmode="decimal" placeholder="ex.: 0,10"></label>
+        <label class="fld"><span>Total recebido (R$)</span><input type="text" name="total" inputmode="decimal" placeholder="ex.: 7,50"></label>
+      </div>
+      <div id="ld-prev" class="muted" style="font-size:12.5px"></div>
+      <p class="muted" style="font-size:12px">Preencha <b>um</b> dos dois — o outro é calculado pela quantidade de cotas. O que você lança aqui vale como fonte oficial daquele ativo (não é sobrescrito ao atualizar cotações).</p>
+      <div id="ld-lista" class="mt"></div>
+    `, (form) => {
+      const ticker = form.ticker.value;
+      const a = assets.find(x => x.ticker === ticker);
+      let porCota = U.parseMoney(form.porCota.value);
+      const total = U.parseMoney(form.total.value);
+      if (porCota == null && total != null && a && a.qty) porCota = Math.round((total / a.qty) * 1e6) / 1e6;
+      if (porCota == null || porCota <= 0 || !form.data.value) return false;
+      Store.addDividendoManual(ticker, { value: porCota, payDate: form.data.value });
+      App.render();
+    }, { okLabel: "Lançar" });
+
+    const sel = ov.querySelector('select[name="ticker"]');
+    const pc = ov.querySelector('input[name="porCota"]');
+    const tot = ov.querySelector('input[name="total"]');
+    const prev = ov.querySelector("#ld-prev");
+    const lista = ov.querySelector("#ld-lista");
+    const qtdSel = () => { const a = assets.find(x => x.ticker === sel.value); return a ? a.qty : 0; };
+    function calcPrev() {
+      const v = U.parseMoney(pc.value);
+      prev.innerHTML = (v != null && qtdSel()) ? `= <b class="pos">${U.brl(Math.round(v * qtdSel() * 100) / 100)}</b> <span class="muted">(${qtdSel()} cotas × ${U.brl(v)}/cota)</span>` : "";
+    }
+    pc.addEventListener("input", () => { const v = U.parseMoney(pc.value); if (v != null && qtdSel()) tot.value = String(Math.round(v * qtdSel() * 100) / 100).replace(".", ","); calcPrev(); });
+    tot.addEventListener("input", () => { const v = U.parseMoney(tot.value); if (v != null && qtdSel()) pc.value = String(Math.round((v / qtdSel()) * 1e6) / 1e6).replace(".", ","); calcPrev(); });
+    sel.addEventListener("change", () => { renderLista(); calcPrev(); });
+    function renderLista() {
+      const man = (Store.inv().dividendsManual || {})[sel.value] || [];
+      if (!man.length) { lista.innerHTML = `<p class="muted" style="font-size:12px">Nenhum lançamento manual para ${U.esc(sel.value)} ainda.</p>`; return; }
+      lista.innerHTML = `<div class="muted" style="font-size:12px;margin-bottom:4px">Lançamentos de <b>${U.esc(sel.value)}</b>:</div>`;
+      for (const x of man.slice().reverse()) {
+        const pcTxt = "R$ " + Number(x.value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        const row = U.el(`<div class="list-row"><span class="grow">${U.dataBR(x.payDate)} · ${pcTxt}/cota</span><button class="btn-sm btn-danger" title="Remover">✕</button></div>`);
+        row.querySelector("button").addEventListener("click", () => { Store.removeDividendoManual(sel.value, x.id); renderLista(); App.render(); });
+        lista.appendChild(row);
+      }
+    }
+    renderLista();
   }
 
   function abrirEditarAtivo(a) {
@@ -270,7 +325,10 @@ const ViewInvestimentos = (() => {
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <b style="font-size:15px">💰 Dividendos recebidos${fonteDiv ? ` <span class="muted" style="font-size:11.5px;font-weight:400">(${fonteDiv})</span>` : ""}</b>
-          <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" max="${U.ymHoje()}" style="width:auto;display:inline-block;padding:2px 6px"></label>
+          <div class="row-gap" style="align-items:center">
+            <button class="btn-sm btn-primary" id="btn-lanc-div">＋ Lançar</button>
+            <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" max="${U.ymHoje()}" style="width:auto;display:inline-block;padding:2px 6px"></label>
+          </div>
         </div>
         ${div.since > U.ymHoje() ? `<p class="muted" style="font-size:12px;color:var(--critical);margin:6px 0 0">⚠️ O mês escolhido (${U.ymLabel(div.since)}) está no futuro — nada foi recebido ainda. Escolha um mês passado (ex.: quando você comprou as cotas).</p>` : ""}
         <div id="div-body" class="mt"></div>
@@ -312,6 +370,8 @@ const ViewInvestimentos = (() => {
     const mesLabel = (ym) => { const [y, m] = ym.split("-"); return U.MESES_ABREV[Number(m) - 1] + "/" + y.slice(2); };
     const sinceEl = root.querySelector("#div-since");
     if (sinceEl) sinceEl.addEventListener("change", () => { Store.setDivSince(sinceEl.value); App.render(); });
+    const btnLanc = root.querySelector("#btn-lanc-div");
+    if (btnLanc) btnLanc.addEventListener("click", () => abrirLancarDividendo(null));
 
     const divBody = root.querySelector("#div-body");
     const pcFmt = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });

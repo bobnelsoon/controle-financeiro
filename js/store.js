@@ -146,6 +146,8 @@ const Store = (() => {
     if (!st.faturasPagas || typeof st.faturasPagas !== "object") st.faturasPagas = {};
     // Dividendos dos ativos (idempotente).
     if (st.investments && !st.investments.dividends) st.investments.dividends = {};
+    // Dividendos lançados manualmente pelo usuário (idempotente).
+    if (st.investments && !st.investments.dividendsManual) st.investments.dividendsManual = {};
     return st;
   }
 
@@ -529,6 +531,30 @@ const Store = (() => {
   }
   function setDivSince(ym) { inv().divSince = ym; save(); }
 
+  // Dividendos lançados MANUALMENTE pelo usuário (ele registra assim que recebe). São a fonte de
+  // verdade do ticker: têm prioridade sobre a busca automática e NÃO são sobrescritos ao atualizar
+  // cotações. Estrutura: { ticker: [{ id, value (por cota), payDate }] }.
+  function dividendosManuais() {
+    const i = inv();
+    if (!i.dividendsManual) i.dividendsManual = {};
+    return i.dividendsManual;
+  }
+  function addDividendoManual(ticker, entry) {
+    const m = dividendosManuais();
+    if (!m[ticker]) m[ticker] = [];
+    m[ticker].push({ id: U.id(), value: entry.value, payDate: entry.payDate });
+    m[ticker].sort((a, b) => (a.payDate < b.payDate ? -1 : 1));
+    save();
+  }
+  function removeDividendoManual(ticker, id) {
+    const m = dividendosManuais();
+    if (m[ticker]) {
+      m[ticker] = m[ticker].filter(x => x.id !== id);
+      if (!m[ticker].length) delete m[ticker];
+      save();
+    }
+  }
+
   // Token da API brapi.dev (cotações + dividendos). NÃO é travado por domínio — é uma credencial
   // pessoal da conta do usuário, então NÃO fica no código público: vive nos dados (settings), que
   // sincronizam de forma privada pelo Gist. O usuário cola uma vez em Configurações e vale em todos
@@ -542,14 +568,18 @@ const Store = (() => {
   // total da carteira e o yield sobre o patrimônio em RV.
   function dividendosResumo(desde) {
     const divs = inv().dividends || {};
+    const man = inv().dividendsManual || {};
     const since = desde || divSince();
     const hoje = U.hojeISO();
     const linhas = [];
     let total = 0;
     let ultimoDisponivel = null;
     for (const a of inv().assets) {
-      const d = divs[a.ticker];
-      const list = d ? (d.list || (d.value != null ? [{ value: d.value, payDate: d.payDate }] : [])) : [];
+      // O que o usuário lançou à mão tem prioridade sobre a busca automática (fonte de verdade).
+      const manual = man[a.ticker] && man[a.ticker].length ? man[a.ticker] : null;
+      const d = manual ? null : divs[a.ticker];
+      const list = manual ? manual : (d ? (d.list || (d.value != null ? [{ value: d.value, payDate: d.payDate }] : [])) : []);
+      const src = manual ? "manual" : (d ? d.source : null);
       let ultimoPay = null, ultimoValor = null;
       for (const x of list) {
         if (!x.payDate) continue;
@@ -566,7 +596,7 @@ const Store = (() => {
         ticker: a.ticker, type: a.type, qty: a.qty,
         perCota, total: t, n: itens.length,
         temDados: list.length > 0, temNoPeriodo: itens.length > 0,
-        ultimoPay, ultimoValor, source: d ? d.source : null
+        manual: !!manual, ultimoPay, ultimoValor, source: src
       });
     }
     total = Math.round(total * 100) / 100;
@@ -819,7 +849,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, brapiToken, setBrapiToken, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
