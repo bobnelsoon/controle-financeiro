@@ -1,5 +1,8 @@
-// Cotações de ações e FIIs da B3 — fonte principal: HG Brasil (chave exposta, restrita ao domínio
-// bobnelsoon.github.io); reservas: mfinance, brapi.dev e Yahoo Finance. Dividendos: mfinance (histórico).
+// Cotações de ações e FIIs da B3 e dividendos por cota.
+// Fonte principal: brapi.dev (token pessoal do usuário, guardado nas Configurações e sincronizado
+// de forma privada — NÃO fica no código). Uma só chamada traz cotação + dividendos.
+// Reservas de cotação: HG Brasil (chave exposta, travada no domínio), mfinance e Yahoo.
+// Reserva de dividendos: mfinance (histórico).
 "use strict";
 
 const Quotes = (() => {
@@ -7,7 +10,39 @@ const Quotes = (() => {
   // do tipo browser + domain-locked, pode ficar no código (só funciona a partir do site do usuário).
   const HG_KEY = "c0f5c4be";
 
-  // HG Brasil aceita vários símbolos numa chamada só (economiza consultas da cota).
+  // ---------- brapi.dev (principal): cotação + dividendos numa chamada só ----------
+  // Aceita vários tickers separados por vírgula. Com `dividends=true` vem o histórico de proventos.
+  async function viaBrapiFull(tickers, token) {
+    if (!tickers.length) return { quotes: {}, dividends: {} };
+    const url = `https://brapi.dev/api/quote/${encodeURIComponent(tickers.join(","))}?dividends=true` +
+      (token ? `&token=${encodeURIComponent(token)}` : "");
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    const results = (j && j.results) || [];
+    const quotes = {}, dividends = {};
+    for (const q of results) {
+      const t = q && q.symbol;
+      if (!t) continue;
+      if (q.regularMarketPrice != null) {
+        const prev = q.regularMarketPreviousClose != null ? q.regularMarketPreviousClose : q.regularMarketPrice;
+        quotes[t] = { price: q.regularMarketPrice, prevClose: prev, name: q.longName || q.shortName || t, updatedAt: Date.now() };
+      }
+      const cash = q.dividendsData && q.dividendsData.cashDividends;
+      if (Array.isArray(cash) && cash.length) {
+        const list = cash
+          .filter(x => x.rate != null && x.paymentDate)
+          .map(x => ({ value: Number(x.rate), payDate: String(x.paymentDate).slice(0, 10) }))
+          .filter(x => !isNaN(x.value) && x.payDate)
+          .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
+          .slice(-48); // no máximo ~4 anos, para não inflar o backup
+        if (list.length) dividends[t] = { list, updatedAt: Date.now() };
+      }
+    }
+    return { quotes, dividends };
+  }
+
+  // ---------- HG Brasil (reserva de cotação): vários símbolos numa chamada só ----------
   async function viaHGMany(tickers) {
     if (!tickers.length) return {};
     const url = `https://api.hgbrasil.com/finance/stock_price?key=${HG_KEY}&symbol=${encodeURIComponent(tickers.join(","))}`;
@@ -29,11 +64,6 @@ const Quotes = (() => {
     return out;
   }
 
-  async function viaHG(ticker) {
-    const m = await viaHGMany([ticker]);
-    if (m[ticker]) return m[ticker];
-    throw new Error("sem dados");
-  }
   // mfinance tem endpoints separados para FIIs e ações — tenta os dois
   async function viaMfinance(ticker) {
     const bases = ticker.match(/11B?$/) // FIIs geralmente terminam em 11
@@ -60,17 +90,9 @@ const Quotes = (() => {
   }
 
   async function viaBrapi(ticker) {
-    const r = await fetch(`https://brapi.dev/api/quote/${encodeURIComponent(ticker)}`);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const j = await r.json();
-    const q = j.results && j.results[0];
-    if (!q || q.regularMarketPrice == null) throw new Error("sem dados");
-    return {
-      price: q.regularMarketPrice,
-      prevClose: q.regularMarketPreviousClose != null ? q.regularMarketPreviousClose : q.regularMarketPrice,
-      name: q.longName || q.shortName || ticker,
-      updatedAt: Date.now()
-    };
+    const { quotes } = await viaBrapiFull([ticker], "");
+    if (quotes[ticker]) return quotes[ticker];
+    throw new Error("sem dados");
   }
 
   async function viaYahoo(ticker) {
@@ -89,28 +111,51 @@ const Quotes = (() => {
     };
   }
 
+  function tokenAtual() {
+    try { return (typeof Store !== "undefined" && Store.brapiToken) ? Store.brapiToken() : ""; }
+    catch (e) { return ""; }
+  }
+
   async function fetchQuote(ticker) {
-    const fontes = [viaHG, viaMfinance, viaBrapi, viaYahoo];
+    const token = tokenAtual();
+    const fontes = [() => viaBrapiFull([ticker], token).then(r => { if (r.quotes[ticker]) return r.quotes[ticker]; throw new Error("sem dados"); }), viaHG1, viaMfinance, viaYahoo];
     let ultimoErro = null;
     for (const fonte of fontes) {
       try { return await fonte(ticker); } catch (e) { ultimoErro = e; }
     }
     throw ultimoErro || new Error("todas as fontes falharam");
   }
+  async function viaHG1(ticker) {
+    const m = await viaHGMany([ticker]);
+    if (m[ticker]) return m[ticker];
+    throw new Error("sem dados");
+  }
 
-  // Só as fontes reserva (sem HG) — usadas para o que o HG não trouxe na chamada em lote.
+  // Só as fontes reserva (sem brapi) — usadas para o que o brapi/HG não trouxeram.
   async function fetchQuoteReserva(ticker) {
-    for (const fonte of [viaMfinance, viaBrapi, viaYahoo]) {
+    for (const fonte of [viaMfinance, viaYahoo]) {
       try { return await fonte(ticker); } catch (e) {}
     }
     throw new Error("todas as reservas falharam");
   }
 
-  // Busca várias; devolve { ok: {ticker: quote}, falhas: [ticker] }. Tenta o HG numa chamada só
-  // (economiza cota) e cai nas reservas apenas para os que faltarem.
-  async function fetchAll(tickers) {
-    const ok = {};
-    try { Object.assign(ok, await viaHGMany(tickers)); } catch (e) { /* segue pros fallbacks */ }
+  // Busca várias; devolve { ok: {ticker: quote}, falhas: [ticker], dividends: {ticker: {list,...}} }.
+  // 1º tenta o brapi (cotação + dividendos numa chamada só, com o token do usuário); depois o HG em
+  // lote para o que faltar de cotação; por fim as reservas individuais.
+  async function fetchAll(tickers, token) {
+    token = token != null ? token : tokenAtual();
+    const ok = {}, dividends = {};
+    if (token) {
+      try {
+        const r = await viaBrapiFull(tickers, token);
+        Object.assign(ok, r.quotes);
+        Object.assign(dividends, r.dividends);
+      } catch (e) { /* segue pros fallbacks */ }
+    }
+    const semCotacao = tickers.filter(t => !ok[t]);
+    if (semCotacao.length) {
+      try { Object.assign(ok, await viaHGMany(semCotacao)); } catch (e) { /* segue */ }
+    }
     const restantes = tickers.filter(t => !ok[t]);
     const falhas = [];
     if (restantes.length) {
@@ -120,11 +165,12 @@ const Quotes = (() => {
         else falhas.push(t);
       });
     }
-    return { ok, falhas };
+    return { ok, falhas, dividends };
   }
 
-  // Histórico de dividendos por cota (mfinance): devolve { list: [{value, payDate}] } com TODOS os
-  // pagamentos (últimos ~48). FIIs em /fiis/dividends, ações em /stocks/dividends.
+  // ---------- Dividendos (reserva: mfinance) ----------
+  // Histórico de dividendos por cota: devolve { list: [{value, payDate}] } com TODOS os pagamentos
+  // (últimos ~48). FIIs em /fiis/dividends, ações em /stocks/dividends. Usado quando o brapi não trouxe.
   async function fetchDividend(ticker) {
     const bases = ticker.match(/11B?$/) ? ["fiis", "stocks"] : ["stocks", "fiis"];
     let ultimoErro = null;
