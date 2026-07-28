@@ -251,8 +251,8 @@ const ViewInvestimentos = (() => {
 
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <b style="font-size:15px">💰 Dividendos (último por cota)</b>
-          <span class="muted" style="font-size:12px">busca junto com as cotações</span>
+          <b style="font-size:15px">💰 Dividendos recebidos</b>
+          <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" style="width:auto;display:inline-block;padding:2px 6px"></label>
         </div>
         <div id="div-body" class="mt"></div>
       </div>
@@ -289,23 +289,26 @@ const ViewInvestimentos = (() => {
     root.querySelector("#btn-imp-inv").addEventListener("click", abrirImportar);
     root.querySelector("#btn-rf").addEventListener("click", () => abrirRendaFixa(null));
 
-    // Card de dividendos (último por cota de cada ativo × cotas)
+    // Card de dividendos: soma de tudo pago por cota desde `div.since` × cotas.
+    const mesLabel = (ym) => { const [y, m] = ym.split("-"); return U.MESES_ABREV[Number(m) - 1] + "/" + y.slice(2); };
+    const sinceEl = root.querySelector("#div-since");
+    if (sinceEl) sinceEl.addEventListener("change", () => { Store.setDivSince(sinceEl.value); App.render(); });
+
     const divBody = root.querySelector("#div-body");
     if (!div.linhas.length) {
-      divBody.innerHTML = `<p class="empty">Sem dados de dividendos ainda. Clique em "🔄 Atualizar cotações" (os dividendos são buscados junto).</p>`;
+      const extra = div.ultimoDisponivel ? ` Último pagamento disponível na fonte: <b>${U.dataBR(div.ultimoDisponivel)}</b>.` : ` Clique em "🔄 Atualizar cotações" (os dividendos vêm junto).`;
+      divBody.innerHTML = `<p class="empty">Nenhum dividendo pago a partir de ${mesLabel(div.since)}.${extra}</p>`;
     } else {
       divBody.appendChild(U.el(`
         <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
           <span class="pos num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
-          <span class="muted" style="font-size:12.5px">soma do último dividendo de cada ativo${div.yieldPct != null ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
+          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}${div.yieldPct != null ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
         </div>`));
       for (const l of div.linhas) {
-        let mes = "";
-        if (l.payDate) { const d = new Date(l.payDate); if (!isNaN(d)) mes = " · pago " + U.MESES_ABREV[d.getMonth()] + "/" + String(d.getFullYear()).slice(2); }
         const pc = "R$ " + l.perCota.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
         divBody.appendChild(U.el(`
           <div class="list-row">
-            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${pc}/cota${mes}</span></span>
+            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pc}/cota</span></span>
             <b class="num pos">${U.brl(l.total)}</b>
           </div>`));
       }

@@ -30,7 +30,8 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
 - `js/store.js` — `Store`: estado + persistência (localStorage) + toda a lógica de cálculo e migração.
 - `js/charts.js` — `Charts`: gráficos SVG à mão (linha de saldo, barras).
 - `js/quotes.js` — `Quotes`: cotações de ações/FIIs (mfinance → brapi → Yahoo) + **dividendos**
-  (`fetchDividend`/`fetchDividendsAll` via mfinance `/{fiis|stocks}/dividends/{ticker}`, pega o último por cota).
+  (`fetchDividend`/`fetchDividendsAll` via mfinance `/{fiis|stocks}/dividends/{ticker}` — devolve o **histórico**
+  `list:[{value,payDate}]`, últimos ~48). mfinance já traz TODOS os pagamentos; pode atrasar meses recentes.
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
   como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
   `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
@@ -130,9 +131,11 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   **"Preço médio"** (era "Preço pago"). Botão **"＋ aporte"** por ativo (`ViewInvestimentos.abrirAporte`):
   registra uma nova compra (qtd + preço desta compra) e recalcula a **média ponderada**, com prévia ao vivo
   do novo preço médio. O KPI **"Ações e FIIs"** (redundante com Patrimônio) virou **"📈 Rentabilidade"**
-  (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos (último por cota)"**: `state.investments.dividends`
-  (`{ticker:{value,payDate}}`) buscado junto com as cotações em `atualizarCotacoes`; `Store.dividendosResumo`
-  soma `valor/cota × cotas` por ativo + yield sobre o patrimônio. **Só informativo** (não entra no fluxo).
+  (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos recebidos"**: `state.investments.dividends`
+  (`{ticker:{list:[{value,payDate}]}}`, histórico) buscado junto com as cotações; `Store.dividendosResumo(desde)`
+  **soma todos os dividendos por cota pagos a partir de `desde`** (× cotas) + yield. `desde` = `Store.divSince()`
+  (`state.investments.divSince`, ajustável por um seletor de mês no card; padrão = início do ano). **Só
+  informativo** (não entra no fluxo). Se não houver pagamento no período, mostra o último disponível na fonte.
   No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
   (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
   Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI
