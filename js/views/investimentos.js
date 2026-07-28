@@ -270,8 +270,9 @@ const ViewInvestimentos = (() => {
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <b style="font-size:15px">💰 Dividendos recebidos${fonteDiv ? ` <span class="muted" style="font-size:11.5px;font-weight:400">(${fonteDiv})</span>` : ""}</b>
-          <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" style="width:auto;display:inline-block;padding:2px 6px"></label>
+          <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" max="${U.ymHoje()}" style="width:auto;display:inline-block;padding:2px 6px"></label>
         </div>
+        ${div.since > U.ymHoje() ? `<p class="muted" style="font-size:12px;color:var(--critical);margin:6px 0 0">⚠️ O mês escolhido (${U.ymLabel(div.since)}) está no futuro — nada foi recebido ainda. Escolha um mês passado (ex.: quando você comprou as cotas).</p>` : ""}
         <div id="div-body" class="mt"></div>
       </div>
 
