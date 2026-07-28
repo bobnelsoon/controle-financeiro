@@ -1,8 +1,8 @@
 // Cotações de ações e FIIs da B3 e dividendos por cota.
-// Fonte principal: brapi.dev (token pessoal do usuário, guardado nas Configurações e sincronizado
-// de forma privada — NÃO fica no código). Uma só chamada traz cotação + dividendos.
-// Reservas de cotação: HG Brasil (chave exposta, travada no domínio), mfinance e Yahoo.
-// Reserva de dividendos: mfinance (histórico).
+// COTAÇÃO: fonte principal brapi.dev (token pessoal do usuário, nas Configurações, sincronizado
+// privado — NÃO fica no código); reservas HG Brasil (chave exposta travada no domínio), mfinance, Yahoo.
+// DIVIDENDOS: o plano GRÁTIS do brapi NÃO traz proventos (é dos planos pagos), então a fonte é o
+// Yahoo Finance (grátis, atual), com a mfinance como último recurso (costuma ficar defasada).
 "use strict";
 
 const Quotes = (() => {
@@ -205,10 +205,33 @@ const Quotes = (() => {
     return { ok, falhas, dividends };
   }
 
-  // ---------- Dividendos (reserva: mfinance) ----------
-  // Histórico de dividendos por cota: devolve { list: [{value, payDate}] } com TODOS os pagamentos
-  // (últimos ~48). FIIs em /fiis/dividends, ações em /stocks/dividends. Usado quando o brapi não trouxe.
-  async function fetchDividend(ticker) {
+  // ---------- Dividendos ----------
+  // ⚠️ O plano GRATUITO do brapi NÃO traz dividendos (é recurso dos planos pagos). Então, quando o
+  // brapi não devolve proventos, a fonte principal aqui é o **Yahoo Finance** (grátis, dados atuais),
+  // com a **mfinance** só como último recurso (costuma ficar defasada).
+
+  // Yahoo: dividendos vêm no chart com events=div → chart.result[0].events.dividends
+  // ({ ts: { amount, date } }). A data do Yahoo é a data-com/ex (aproxima o mês do pagamento).
+  async function viaYahooDividends(ticker) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}.SA?interval=1d&range=3y&events=div`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    const res = j.chart && j.chart.result && j.chart.result[0];
+    const divs = res && res.events && res.events.dividends;
+    if (!divs) throw new Error("sem dividendos");
+    const list = Object.values(divs)
+      .filter(d => d && d.amount != null && d.date)
+      .map(d => ({ value: Number(d.amount), payDate: new Date(d.date * 1000).toISOString().slice(0, 10) }))
+      .filter(d => !isNaN(d.value) && d.payDate)
+      .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
+      .slice(-48); // no máximo ~4 anos, para não inflar o backup
+    if (!list.length) throw new Error("sem dividendos");
+    return { list, source: "yahoo", updatedAt: Date.now() };
+  }
+
+  // mfinance: histórico por cota. FIIs em /fiis/dividends, ações em /stocks/dividends.
+  async function viaMfinanceDividends(ticker) {
     const bases = ticker.match(/11B?$/) ? ["fiis", "stocks"] : ["stocks", "fiis"];
     let ultimoErro = null;
     for (const base of bases) {
@@ -222,13 +245,19 @@ const Quotes = (() => {
             .filter(x => x.value != null && (x.payDate || x.declaredDate))
             .map(x => ({ value: x.value, payDate: (x.payDate || x.declaredDate).slice(0, 10) }))
             .sort((a, b) => (a.payDate < b.payDate ? -1 : 1))
-            .slice(-48); // no máximo ~4 anos, para não inflar o backup
+            .slice(-48);
           if (list.length) return { list, source: "mfinance", updatedAt: Date.now() };
         }
         ultimoErro = new Error("sem dividendos");
       } catch (e) { ultimoErro = e; }
     }
     throw ultimoErro || new Error("sem dividendos");
+  }
+
+  // Fonte de dividendos por ticker: Yahoo primeiro (atual), mfinance como reserva.
+  async function fetchDividend(ticker) {
+    try { return await viaYahooDividends(ticker); } catch (e) {}
+    return await viaMfinanceDividends(ticker);
   }
 
   async function fetchDividendsAll(tickers) {

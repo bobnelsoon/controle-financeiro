@@ -543,6 +543,7 @@ const Store = (() => {
   function dividendosResumo(desde) {
     const divs = inv().dividends || {};
     const since = desde || divSince();
+    const hoje = U.hojeISO();
     const linhas = [];
     let total = 0;
     let ultimoDisponivel = null;
@@ -552,10 +553,12 @@ const Store = (() => {
       let ultimoPay = null, ultimoValor = null;
       for (const x of list) {
         if (!x.payDate) continue;
-        if (!ultimoPay || x.payDate > ultimoPay) { ultimoPay = x.payDate; ultimoValor = x.value; }
+        // "último pago" considera só o que já foi pago (payDate <= hoje) — evita anúncios futuros.
+        if (x.payDate <= hoje && (!ultimoPay || x.payDate > ultimoPay)) { ultimoPay = x.payDate; ultimoValor = x.value; }
         if (!ultimoDisponivel || x.payDate > ultimoDisponivel) ultimoDisponivel = x.payDate;
       }
-      const itens = list.filter(x => x.value != null && x.payDate && x.payDate.slice(0, 7) >= since);
+      // Recebido = pago no período E já pago (não conta provento anunciado com data futura).
+      const itens = list.filter(x => x.value != null && x.payDate && x.payDate.slice(0, 7) >= since && x.payDate <= hoje);
       const perCota = Math.round(itens.reduce((s, x) => s + x.value, 0) * 1e6) / 1e6;
       const t = Math.round(perCota * a.qty * 100) / 100;
       total += t;

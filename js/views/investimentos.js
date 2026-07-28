@@ -41,7 +41,7 @@ const ViewInvestimentos = (() => {
       if (dividends && Object.keys(dividends).length) Store.saveDividends(dividends);
       if (falhas.length) ultimaFalha = "Sem cotação para: " + falhas.join(", ");
       if (!Object.keys(ok).length && falhas.length) ultimaFalha = "Não foi possível buscar as cotações — verifique a internet.";
-      if (!token) ultimaFalha = (ultimaFalha ? ultimaFalha + " · " : "") + "Dica: cadastre o token do brapi em Configurações para cotações e dividendos mais completos.";
+      if (!token) ultimaFalha = (ultimaFalha ? ultimaFalha + " · " : "") + "Dica: cadastre o token do brapi em Configurações para as cotações. (Os dividendos vêm do Yahoo — grátis.)";
       // Dividendos que o brapi não trouxe (sem token, ou ativo sem dados): tenta a reserva (mfinance).
       const semDiv = tickers.filter(t => !dividends || !dividends[t]);
       if (semDiv.length) {
@@ -328,10 +328,11 @@ const ViewInvestimentos = (() => {
       }
       // Lista TODOS os ativos: quem pagou no período em destaque; os demais com o último pagamento.
       for (const l of div.linhas) {
+        const fonte = l.source ? ` · ${FONTE_NOME[l.source] || l.source}` : "";
         if (l.total > 0) {
           divBody.appendChild(U.el(`
             <div class="list-row">
-              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pcFmt(l.perCota)}/cota</span></span>
+              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pcFmt(l.perCota)}/cota${fonte}</span></span>
               <b class="num pos">${U.brl(l.total)}</b>
             </div>`));
         } else {
@@ -340,7 +341,7 @@ const ViewInvestimentos = (() => {
             : (l.temDados ? "sem pagamento registrado" : "sem dados — clique em 🔄 Atualizar");
           divBody.appendChild(U.el(`
             <div class="list-row" style="opacity:.72">
-              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${dica}</span></span>
+              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${dica}${fonte}</span></span>
               <b class="num muted">${U.brl(0)}</b>
             </div>`));
         }

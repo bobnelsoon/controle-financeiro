@@ -35,7 +35,11 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   cotação em `results[0].regularMarketPrice`/`regularMarketPreviousClose`/`longName` e dividendos em
   `results[0].dividendsData.cashDividends[]` → `{value: rate, payDate: paymentDate}`). Cada cotação/dividendo
   carrega um `source` (`brapi`/`hg`/`mfinance`/`yahoo`) exibido na tela Investimentos (`fontesLabel` → "via
-  brapi"). O **token do brapi**
+  brapi", e a fonte por ativo no card de dividendos). ⚠️ **O plano GRÁTIS do brapi NÃO traz dividendos**
+  (é recurso dos planos pagos), então **dividendos vêm do Yahoo Finance** (`viaYahooDividends`, `events=div`,
+  grátis e atual; a data é a data-com/ex), com a **mfinance** só como último recurso (costuma ficar defasada).
+  `dividendosResumo` só conta como recebido o que tem `payDate <= hoje` (ignora provento anunciado com data
+  futura). O **token do brapi**
   NÃO é travado por domínio (credencial pessoal), então **NÃO fica no código**: vive em
   `state.settings.brapiToken` (setado em Configurações, sincroniza privado pelo Gist) e é lido por
   `Store.brapiToken()`. `fetchAll(tickers, token)` devolve `{ ok, falhas, dividends }`: tenta brapi (cota +
