@@ -22,7 +22,7 @@ const Store = (() => {
       budgets: {},
       cardTx: [],
       faturasPagas: {},
-      investments: { assets: [], fixed: [], quotes: {}, history: [] },
+      investments: { assets: [], fixed: [], quotes: {}, dividends: {}, history: [] },
       fuel: { entries: [], vehicle: defaultVehicle(), maintenance: [] }
     };
   }
@@ -144,6 +144,8 @@ const Store = (() => {
     }
     // Faturas pagas por cartão/mês (idempotente).
     if (!st.faturasPagas || typeof st.faturasPagas !== "object") st.faturasPagas = {};
+    // Dividendos dos ativos (idempotente).
+    if (st.investments && !st.investments.dividends) st.investments.dividends = {};
     return st;
   }
 
@@ -515,6 +517,31 @@ const Store = (() => {
     save();
   }
 
+  // Dividendos: guarda o último dividendo por cota de cada ativo ({ ticker: {value, payDate, updatedAt} }).
+  function saveDividends(mapa) {
+    if (!inv().dividends) inv().dividends = {};
+    Object.assign(inv().dividends, mapa);
+    save();
+  }
+  // Resumo: por ativo o último dividendo (valor/cota × cotas) + total e yield sobre o patrimônio em RV.
+  function dividendosResumo() {
+    const divs = inv().dividends || {};
+    const linhas = [];
+    let total = 0;
+    for (const a of inv().assets) {
+      const d = divs[a.ticker];
+      if (!d || d.value == null) continue;
+      const t = Math.round(d.value * a.qty * 100) / 100;
+      total += t;
+      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, perCota: d.value, total: t, payDate: d.payDate || null });
+    }
+    total = Math.round(total * 100) / 100;
+    const patr = rvTotal();
+    const yieldPct = patr > 0 ? (total / patr) * 100 : null;
+    linhas.sort((a, b) => b.total - a.total);
+    return { linhas, total, yieldPct };
+  }
+
   // Aportes do ano: soma do item de fluxo cujo nome contém "invest" (valores negativos = dinheiro aplicado)
   function aportesDoAno(ano) {
     let t = 0;
@@ -753,7 +780,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,

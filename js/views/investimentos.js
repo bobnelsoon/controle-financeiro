@@ -29,6 +29,8 @@ const ViewInvestimentos = (() => {
       if (Object.keys(ok).length) Store.saveQuotes(ok);
       if (falhas.length) ultimaFalha = "Sem cotação para: " + falhas.join(", ");
       if (!Object.keys(ok).length && falhas.length) ultimaFalha = "Não foi possível buscar as cotações — verifique a internet.";
+      // Dividendos (não bloqueia se falhar) — busca o último por cota de cada ativo.
+      try { const dd = await Quotes.fetchDividendsAll(tickers); if (Object.keys(dd.ok).length) Store.saveDividends(dd.ok); } catch (e) {}
     } catch (e) {
       ultimaFalha = "Erro ao buscar cotações: " + e.message;
     }
@@ -208,6 +210,8 @@ const ViewInvestimentos = (() => {
     const rf = Store.rfTotal();
     const total = rv + rf;
     const aportes = Store.aportesDoAno(ano);
+    const rent = Store.carteiraRentabilidade();
+    const div = Store.dividendosResumo();
 
     const qs = Object.values(inv.quotes);
     const ultimaAtt = qs.length ? Math.max(...qs.map(q => q.updatedAt || 0)) : null;
@@ -228,8 +232,11 @@ const ViewInvestimentos = (() => {
           <div class="stat-value num">${U.brl(total)}</div>
         </div>
         <div class="card stat">
-          <div class="stat-label">Ações e FIIs</div>
-          <div class="stat-value num">${U.brl(rv)}</div>
+          <div class="stat-label">📈 Rentabilidade</div>
+          ${rent
+            ? `<div class="stat-value num ${rent.ganho >= 0 ? "pos" : "neg"}">${rent.ganho >= 0 ? "+" : ""}${U.brl(rent.ganho)}</div>
+               <div class="stat-sub ${rent.ganho >= 0 ? "pos" : "neg"}">${rent.ganho >= 0 ? "+" : ""}${rent.pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% · vs. preço médio</div>`
+            : `<div class="stat-value num muted">—</div><div class="stat-sub">informe o preço médio / atualize as cotações</div>`}
         </div>
         <div class="card stat">
           <div class="stat-label">Renda fixa e outros</div>
@@ -240,6 +247,14 @@ const ViewInvestimentos = (() => {
           <div class="stat-value num pos">${U.brl(aportes)}</div>
           <div class="stat-sub">item "Investimento" do Fluxo Anual</div>
         </div>
+      </div>
+
+      <div class="card mb">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <b style="font-size:15px">💰 Dividendos (último por cota)</b>
+          <span class="muted" style="font-size:12px">busca junto com as cotações</span>
+        </div>
+        <div id="div-body" class="mt"></div>
       </div>
 
       <div class="card mb">
@@ -273,6 +288,28 @@ const ViewInvestimentos = (() => {
     root.querySelector("#btn-ativo").addEventListener("click", abrirNovoAtivo);
     root.querySelector("#btn-imp-inv").addEventListener("click", abrirImportar);
     root.querySelector("#btn-rf").addEventListener("click", () => abrirRendaFixa(null));
+
+    // Card de dividendos (último por cota de cada ativo × cotas)
+    const divBody = root.querySelector("#div-body");
+    if (!div.linhas.length) {
+      divBody.innerHTML = `<p class="empty">Sem dados de dividendos ainda. Clique em "🔄 Atualizar cotações" (os dividendos são buscados junto).</p>`;
+    } else {
+      divBody.appendChild(U.el(`
+        <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
+          <span class="pos num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
+          <span class="muted" style="font-size:12.5px">soma do último dividendo de cada ativo${div.yieldPct != null ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
+        </div>`));
+      for (const l of div.linhas) {
+        let mes = "";
+        if (l.payDate) { const d = new Date(l.payDate); if (!isNaN(d)) mes = " · pago " + U.MESES_ABREV[d.getMonth()] + "/" + String(d.getFullYear()).slice(2); }
+        const pc = "R$ " + l.perCota.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        divBody.appendChild(U.el(`
+          <div class="list-row">
+            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${pc}/cota${mes}</span></span>
+            <b class="num pos">${U.brl(l.total)}</b>
+          </div>`));
+      }
+    }
 
     // Tabela de renda variável
     const rvBody = root.querySelector("#rv-body");
