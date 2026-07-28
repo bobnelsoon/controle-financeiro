@@ -9,6 +9,15 @@ const ViewInvestimentos = (() => {
 
   const TIPOS_RF = ["CDB", "LCA", "LCI", "Tesouro Direto", "Poupança", "Cripto", "Outro"];
   const TIPO_LABEL = { fii: "FII", acao: "Ação" };
+  const FONTE_NOME = { brapi: "brapi", hg: "HG Brasil", mfinance: "mfinance", yahoo: "Yahoo" };
+
+  // Resume as fontes de uma lista de dados (cotações/dividendos) num rótulo curto: "via brapi",
+  // "via brapi + HG Brasil"... Ajuda a conferir de onde veio o dado.
+  function fontesLabel(sources) {
+    const distintas = [...new Set((sources || []).filter(Boolean))];
+    if (!distintas.length) return "";
+    return "via " + distintas.map(s => FONTE_NOME[s] || s).join(" + ");
+  }
 
   function quotesDesatualizadas() {
     const qs = Object.values(Store.inv().quotes);
@@ -219,15 +228,17 @@ const ViewInvestimentos = (() => {
     const aportes = Store.aportesDoAno(ano);
     const rent = Store.carteiraRentabilidade();
     const div = Store.dividendosResumo();
+    const fonteDiv = fontesLabel(Object.values(inv.dividends || {}).map(d => d.source));
 
     const qs = Object.values(inv.quotes);
     const ultimaAtt = qs.length ? Math.max(...qs.map(q => q.updatedAt || 0)) : null;
     const attTxt = ultimaAtt ? new Date(ultimaAtt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "nunca";
+    const fonteQuotes = fontesLabel(qs.map(q => q.source));
 
     root.innerHTML = `
       <div class="page-head">
         <h1>Investimentos</h1>
-        <span class="muted" style="font-size:12px">cotações: ${attTxt}</span>
+        <span class="muted" style="font-size:12px">cotações: ${attTxt}${fonteQuotes ? " · " + fonteQuotes : ""}</span>
         <div class="spacer"></div>
         <button id="btn-att" ${atualizando ? "disabled" : ""}>${atualizando ? "Atualizando..." : "🔄 Atualizar cotações"}</button>
       </div>
@@ -258,7 +269,7 @@ const ViewInvestimentos = (() => {
 
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <b style="font-size:15px">💰 Dividendos recebidos</b>
+          <b style="font-size:15px">💰 Dividendos recebidos${fonteDiv ? ` <span class="muted" style="font-size:11.5px;font-weight:400">(${fonteDiv})</span>` : ""}</b>
           <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" style="width:auto;display:inline-block;padding:2px 6px"></label>
         </div>
         <div id="div-body" class="mt"></div>
