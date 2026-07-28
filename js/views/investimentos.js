@@ -283,7 +283,6 @@ const ViewInvestimentos = (() => {
     const aportes = Store.aportesDoAno(ano);
     const rent = Store.carteiraRentabilidade();
     const div = Store.dividendosResumo();
-    const fonteDiv = fontesLabel(Object.values(inv.dividends || {}).map(d => d.source));
 
     const qs = Object.values(inv.quotes);
     const ultimaAtt = qs.length ? Math.max(...qs.map(q => q.updatedAt || 0)) : null;
@@ -324,7 +323,7 @@ const ViewInvestimentos = (() => {
 
       <div class="card mb">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <b style="font-size:15px">💰 Dividendos recebidos${fonteDiv ? ` <span class="muted" style="font-size:11.5px;font-weight:400">(${fonteDiv})</span>` : ""}</b>
+          <b style="font-size:15px">💰 Dividendos recebidos</b>
           <div class="row-gap" style="align-items:center">
             <button class="btn-sm btn-primary" id="btn-lanc-div">＋ Lançar</button>
             <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" max="${U.ymHoje()}" style="width:auto;display:inline-block;padding:2px 6px"></label>
@@ -374,38 +373,23 @@ const ViewInvestimentos = (() => {
     if (btnLanc) btnLanc.addEventListener("click", () => abrirLancarDividendo(null));
 
     const divBody = root.querySelector("#div-body");
-    const pcFmt = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
     if (!div.linhas.length) {
       divBody.innerHTML = `<p class="empty">Nenhum ativo na carteira. Adicione ações/FIIs para ver os dividendos.</p>`;
     } else {
-      const comValor = div.linhas.filter(l => l.total > 0);
+      // Cabeçalho: soma total recebida no período.
       divBody.appendChild(U.el(`
         <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
           <span class="${div.total > 0 ? "pos" : "muted"} num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
-          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}${div.yieldPct ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
+          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}</span>
         </div>`));
-      if (!comValor.length) {
-        divBody.appendChild(U.el(`<p class="muted" style="font-size:12.5px;margin:0 0 6px">Nenhum ativo pagou a partir de ${mesLabel(div.since)}. Abaixo, o último pagamento disponível de cada um.</p>`));
-      }
-      // Lista TODOS os ativos: quem pagou no período em destaque; os demais com o último pagamento.
+      // Lista limpa: só ATIVO · nº de cotas · soma recebida.
       for (const l of div.linhas) {
-        const fonte = l.source ? ` · ${FONTE_NOME[l.source] || l.source}` : "";
-        if (l.total > 0) {
-          divBody.appendChild(U.el(`
-            <div class="list-row">
-              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pcFmt(l.perCota)}/cota${fonte}</span></span>
-              <b class="num pos">${U.brl(l.total)}</b>
-            </div>`));
-        } else {
-          const dica = l.ultimoPay
-            ? `último: ${U.dataBR(l.ultimoPay)} · ${pcFmt(l.ultimoValor)}/cota`
-            : (l.temDados ? "sem pagamento registrado" : "sem dados — clique em 🔄 Atualizar");
-          divBody.appendChild(U.el(`
-            <div class="list-row" style="opacity:.72">
-              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${dica}${fonte}</span></span>
-              <b class="num muted">${U.brl(0)}</b>
-            </div>`));
-        }
+        const cls = l.total > 0 ? "pos" : "muted";
+        divBody.appendChild(U.el(`
+          <div class="list-row"${l.total > 0 ? "" : ' style="opacity:.65"'}>
+            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas</span></span>
+            <b class="num ${cls}">${U.brl(l.total)}</b>
+          </div>`));
       }
     }
 
