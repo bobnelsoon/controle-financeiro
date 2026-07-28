@@ -313,22 +313,37 @@ const ViewInvestimentos = (() => {
     if (sinceEl) sinceEl.addEventListener("change", () => { Store.setDivSince(sinceEl.value); App.render(); });
 
     const divBody = root.querySelector("#div-body");
+    const pcFmt = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
     if (!div.linhas.length) {
-      const extra = div.ultimoDisponivel ? ` Último pagamento disponível na fonte: <b>${U.dataBR(div.ultimoDisponivel)}</b>.` : ` Clique em "🔄 Atualizar cotações" (os dividendos vêm junto).`;
-      divBody.innerHTML = `<p class="empty">Nenhum dividendo pago a partir de ${mesLabel(div.since)}.${extra}</p>`;
+      divBody.innerHTML = `<p class="empty">Nenhum ativo na carteira. Adicione ações/FIIs para ver os dividendos.</p>`;
     } else {
+      const comValor = div.linhas.filter(l => l.total > 0);
       divBody.appendChild(U.el(`
         <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
-          <span class="pos num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
-          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}${div.yieldPct != null ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
+          <span class="${div.total > 0 ? "pos" : "muted"} num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
+          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}${div.yieldPct ? ` · yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre o patrimônio` : ""}</span>
         </div>`));
+      if (!comValor.length) {
+        divBody.appendChild(U.el(`<p class="muted" style="font-size:12.5px;margin:0 0 6px">Nenhum ativo pagou a partir de ${mesLabel(div.since)}. Abaixo, o último pagamento disponível de cada um.</p>`));
+      }
+      // Lista TODOS os ativos: quem pagou no período em destaque; os demais com o último pagamento.
       for (const l of div.linhas) {
-        const pc = "R$ " + l.perCota.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-        divBody.appendChild(U.el(`
-          <div class="list-row">
-            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pc}/cota</span></span>
-            <b class="num pos">${U.brl(l.total)}</b>
-          </div>`));
+        if (l.total > 0) {
+          divBody.appendChild(U.el(`
+            <div class="list-row">
+              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${l.n} pagto(s) · ${pcFmt(l.perCota)}/cota</span></span>
+              <b class="num pos">${U.brl(l.total)}</b>
+            </div>`));
+        } else {
+          const dica = l.ultimoPay
+            ? `último: ${U.dataBR(l.ultimoPay)} · ${pcFmt(l.ultimoValor)}/cota`
+            : (l.temDados ? "sem pagamento registrado" : "sem dados — clique em 🔄 Atualizar");
+          divBody.appendChild(U.el(`
+            <div class="list-row" style="opacity:.72">
+              <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas · ${dica}</span></span>
+              <b class="num muted">${U.brl(0)}</b>
+            </div>`));
+        }
       }
     }
 

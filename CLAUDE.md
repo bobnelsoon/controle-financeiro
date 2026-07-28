@@ -149,7 +149,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   **soma todos os dividendos por cota pagos a partir de `desde`** (× cotas) + yield. `desde` = `Store.divSince()`
   (`state.investments.divSince`, ajustável por um seletor de mês no card; padrão = início do ano). **Só
   informativo** (não entra no fluxo). Se não houver pagamento no período, mostra o último disponível na fonte.
-  No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
+  O card **💰 Dividendos recebidos** lista **TODOS os ativos da carteira** (não só os que pagaram no período):
+`Store.dividendosResumo` devolve uma linha por ativo com o total pago desde `divSince` e, para quem não
+pagou no período, o **último pagamento disponível** (`ultimoPay`/`ultimoValor`) + `source`; a UI destaca os
+que pagaram (verde) e mostra os demais esmaecidos com "último: <data>" ou "sem dados". O brapi é consultado
+**escalonado (3 por vez) com 1 nova tentativa** (`mapLimit` em `quotes.js`), para não estourar o limite do
+plano grátis (429) e trazer dado atual para todos.
+No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
   (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
   Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI
   "Patrimônio investido" do topo foram removidos (`Store.despesasPorCategoria`/`catName` seguem no store,
