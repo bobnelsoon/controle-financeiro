@@ -255,11 +255,21 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607193300`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607194000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#28 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#36 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Dividendos manuais + dashboard de cartões** (PUBLICADO, cache `202607194000`, PRs #29–#36):
+- **Dividendos**: não há fonte grátis de dividendo de FII no navegador (brapi grátis não traz; Yahoo/StatusInvest
+  bloqueados por CORS; mfinance defasada). Solução: **lançamento manual** (`dividendsManual`, botão ＋ Lançar) —
+  ver a seção `js/quotes.js`/Investimentos. O card de dividendos ficou **enxuto**: só **ativo · nº de cotas ·
+  soma recebida** (a pedido do usuário; sem datas/fonte/por-cota nas linhas). Seletor "desde" com `max` = mês
+  atual (não deixa escolher mês futuro) + aviso quando futuro.
+- **Dashboard de cartões**: avança na **DATA DE FECHAMENTO** (`cicloFechou`), mostra "✓ pago" por cartão,
+  faturas fechadas não pagas viram linhas "fatura de <mês> a pagar" somando no rodapé "Em aberto (a pagar)".
+- **Cheque especial**: aviso em vermelho no card Saldo quando `saldoContaAtual < 0` (só informativo).
 
 **Cotações + dividendos pela brapi.dev** (PUBLICADO, cache `202607193300`, PRs #27 e #28):
 - `viaBrapiFull` busca **um ticker por chamada, em paralelo** (`viaBrapiOne`) — o multi-ticker por vírgula é
