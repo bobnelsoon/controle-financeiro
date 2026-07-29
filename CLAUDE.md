@@ -98,8 +98,9 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   - a aba Cartões abre na **fatura vigente** (mês seguinte);
   - o dashboard mostra "fatura de <mês seguinte> (gastos de <mês atual>)". O **quadro de cartões do dashboard**
     (`ViewDashboard`) **avança na DATA DE FECHAMENTO**: `ymCartoes` pula os meses cujo ciclo já fechou
-    (`cicloFechou(ym)` = gasto em mês passado, ou gasto no mês atual com `hoje > maxFech`, onde `maxFech` é o
-    maior `closingDay` dos cartões). Faturas que **fecharam mas ainda têm saldo** aparecem como linhas
+    (`cicloFechou(ym)` = gasto em mês passado, ou gasto no mês atual com `hoje >= minFech`, onde `minFech` é o
+    **menor** `closingDay` dos cartões — assim que o 1º cartão fecha, o quadro já vira; o usuário trabalha um
+    mês à frente) — ou se a fatura do mês já está toda paga. Faturas que **fecharam mas ainda têm saldo** aparecem como linhas
     "fatura de <mês> a pagar" (`vencidas`) e continuam somando no rodapé **"Em aberto (a pagar)"**; cartão com
     fatura quitada mostra "✓ pago <valor>". Quando não há nada a pagar, o rodapé diz "Tudo pago ✓".
   - **Cheque especial**: quando `saldoContaAtual < 0`, o card "Saldo em conta" mostra em vermelho

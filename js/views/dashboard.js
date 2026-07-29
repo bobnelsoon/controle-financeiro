@@ -92,21 +92,22 @@ const ViewDashboard = (() => {
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — o quadro avança na DATA DE FECHAMENTO: quando o ciclo do mês fecha,
-    // passa a mostrar a fatura do mês seguinte (mesmo sem ter pago tudo). Faturas que fecharam e
-    // ainda têm saldo continuam somando no total "Em aberto (a pagar)".
+    // Cartões de crédito — o quadro avança na DATA DE FECHAMENTO: assim que o ciclo do mês começa a
+    // fechar (primeiro cartão fecha), passa a mostrar a fatura do mês seguinte, mesmo sem ter pago
+    // tudo. Faturas que fecharam e ainda têm saldo continuam como linhas "a pagar" no total "Em
+    // aberto". Também avança se a fatura do mês já estiver totalmente paga.
     const closingDays = st.accounts.filter(a => a.type === "cartao" && a.closingDay).map(a => Number(a.closingDay));
-    const maxFech = closingDays.length ? Math.max(...closingDays) : 31;
+    const minFech = closingDays.length ? Math.min(...closingDays) : 31;
     const cicloFechou = (ym) => {
       const sp = U.ymAdd(ym, -1); // mês de gasto dessa fatura
       if (sp < ymAtual) return true;         // gasto num mês passado → já fechou
       if (sp > ymAtual) return false;        // gasto num mês futuro → nem começou
-      return hoje > maxFech;                 // gasto no mês atual: fecha após o maior dia de fechamento
+      return hoje >= minFech;                // gasto no mês atual: fecha a partir do 1º dia de fechamento
     };
     const ymBase = U.ymAdd(ymAtual, 1);
     let ymCartoes = ymBase;
     let _gc = 0;
-    while (_gc++ < 12 && cicloFechou(ymCartoes)) ymCartoes = U.ymAdd(ymCartoes, 1);
+    while (_gc++ < 12 && (cicloFechou(ymCartoes) || (Store.faturaTotal(ymCartoes, null) > 0 && Store.faturaRestante(ymCartoes, null) === 0))) ymCartoes = U.ymAdd(ymCartoes, 1);
     const mesCartoes = U.ymParse(ymCartoes).m;
     const mesGastoCartoes = U.ymParse(U.ymAdd(ymCartoes, -1)).m;
     const cartoesDoMes = st.accounts.filter(a => a.type === "cartao");
