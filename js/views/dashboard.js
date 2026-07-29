@@ -92,13 +92,27 @@ const ViewDashboard = (() => {
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — fatura vigente (gasto do mês atual é pago no mês seguinte,
-    // então a fatura em aberto é a do próximo mês). Todos os cartões aparecem.
+    // Cartões de crédito — mostra a 1ª fatura ainda NÃO quitada. Quando o usuário paga tudo de um
+    // mês (todos os cartões), o quadro avança sozinho para a fatura do mês seguinte.
+    let ymCartoes = U.ymAdd(ymAtual, 1);
+    let _gc = 0;
+    while (_gc++ < 6 && Store.faturaTotal(ymCartoes, null) > 0 && Store.faturaRestante(ymCartoes, null) === 0) {
+      ymCartoes = U.ymAdd(ymCartoes, 1);
+    }
+    const mesCartoes = U.ymParse(ymCartoes).m;
+    const mesGastoCartoes = U.ymParse(U.ymAdd(ymCartoes, -1)).m;
     const cartoes = st.accounts
       .filter(a => a.type === "cartao")
-      .map(a => ({ id: a.id, name: a.name, dueDay: a.dueDay, total: Store.faturaTotal(ymFatura, a.id) }))
-      .sort((a, b) => b.total - a.total);
-    const totalFat = cartoes.reduce((s, c) => s + c.total, 0);
+      .map(a => {
+        const total = Store.faturaTotal(ymCartoes, a.id);
+        const restante = Store.faturaRestante(ymCartoes, a.id);
+        const pagoRec = Store.faturaPaga(a.id, ymCartoes);
+        return { id: a.id, name: a.name, dueDay: a.dueDay, total, restante, pago: !!pagoRec && restante === 0, pagoValor: pagoRec ? pagoRec.value : 0 };
+      })
+      .filter(c => c.total > 0)
+      // ainda a pagar primeiro (maior valor); os já pagos vão para o fim
+      .sort((a, b) => (a.pago === b.pago ? b.restante - a.restante : (a.pago ? 1 : -1)));
+    const totalRestante = Math.round(cartoes.reduce((s, c) => s + c.restante, 0) * 100) / 100;
 
     // Composição da carteira: valor atual em Ações, FIIs e Renda fixa.
     // Ações/FIIs usam a cotação (mesma base do Patrimônio investido); renda fixa é o valor informado.
@@ -173,19 +187,21 @@ const ViewDashboard = (() => {
       ${cartoes.length ? `
       <div class="card mt">
         <div class="cartoes-head">
-          <h2 class="section" style="margin:0">💳 Cartões de crédito — fatura de ${U.MESES[mesFatura - 1]} <span class="muted" style="font-weight:400">(gastos de ${U.MESES[mes - 1]})</span></h2>
+          <h2 class="section" style="margin:0">💳 Cartões de crédito — fatura de ${U.MESES[mesCartoes - 1]} <span class="muted" style="font-weight:400">(gastos de ${U.MESES[mesGastoCartoes - 1]})</span></h2>
           <a href="#cartoes" class="muted" style="font-size:12px;text-decoration:none">ver detalhes →</a>
         </div>
         <div class="cartoes-list" id="dash-cartoes">
           ${cartoes.map(c => `
             <div class="cartao-row clickable" data-goto="cartoes">
               <span class="cartao-nome">${U.esc(c.name)}${c.dueDay ? ` <span class="muted" style="font-weight:400">· dia ${c.dueDay}</span>` : ""}</span>
-              <span class="num ${c.total > 0 ? "neg" : ""}">${U.brl(c.total)}</span>
+              ${c.pago
+                ? `<span class="num pos">✓ pago <span class="muted" style="font-weight:400">${U.brl(c.pagoValor)}</span></span>`
+                : `<span class="num neg">${U.brl(c.restante)}</span>`}
             </div>`).join("")}
         </div>
         <div class="cartoes-total">
-          <span>Total das faturas</span>
-          <b class="num ${totalFat > 0 ? "neg" : ""}">${U.brl(totalFat)}</b>
+          <span>${totalRestante > 0 ? "Falta pagar" : "Tudo pago ✓"}</span>
+          <b class="num ${totalRestante > 0 ? "neg" : "pos"}">${U.brl(totalRestante)}</b>
         </div>
       </div>` : ""}
 
