@@ -97,10 +97,14 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   - nova compra (Lançamentos/Cartões) já vem com a fatura do próximo mês;
   - a aba Cartões abre na **fatura vigente** (mês seguinte);
   - o dashboard mostra "fatura de <mês seguinte> (gastos de <mês atual>)". O **quadro de cartões do dashboard**
-    mostra por cartão o **restante** (verde "✓ pago <valor>" quando a fatura daquele cartão está quitada) e
-    **avança sozinho** para a fatura do mês seguinte quando **toda** a fatura do mês vigente foi paga
-    (`ymCartoes` no `dashboard.js` pula meses com `faturaTotal>0 && faturaRestante==0`); o rodapé mostra
-    "Falta pagar <total restante>" ou "Tudo pago ✓".
+    (`ViewDashboard`) **avança na DATA DE FECHAMENTO**: `ymCartoes` pula os meses cujo ciclo já fechou
+    (`cicloFechou(ym)` = gasto em mês passado, ou gasto no mês atual com `hoje > maxFech`, onde `maxFech` é o
+    maior `closingDay` dos cartões). Faturas que **fecharam mas ainda têm saldo** aparecem como linhas
+    "fatura de <mês> a pagar" (`vencidas`) e continuam somando no rodapé **"Em aberto (a pagar)"**; cartão com
+    fatura quitada mostra "✓ pago <valor>". Quando não há nada a pagar, o rodapé diz "Tudo pago ✓".
+  - **Cheque especial**: quando `saldoContaAtual < 0`, o card "Saldo em conta" mostra em vermelho
+    "⚠️ Cheque especial em uso: <valor>" (só aviso — o negativo já está embutido no saldo/projeção; não vira
+    lançamento pra não contar em dobro).
   - `cardTx[].ym` guarda o mês de pagamento da fatura.
   - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init
     idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.

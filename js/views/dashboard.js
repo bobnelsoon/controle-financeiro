@@ -92,17 +92,26 @@ const ViewDashboard = (() => {
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — mostra a 1ª fatura ainda NÃO quitada. Quando o usuário paga tudo de um
-    // mês (todos os cartões), o quadro avança sozinho para a fatura do mês seguinte.
-    let ymCartoes = U.ymAdd(ymAtual, 1);
+    // Cartões de crédito — o quadro avança na DATA DE FECHAMENTO: quando o ciclo do mês fecha,
+    // passa a mostrar a fatura do mês seguinte (mesmo sem ter pago tudo). Faturas que fecharam e
+    // ainda têm saldo continuam somando no total "Em aberto (a pagar)".
+    const closingDays = st.accounts.filter(a => a.type === "cartao" && a.closingDay).map(a => Number(a.closingDay));
+    const maxFech = closingDays.length ? Math.max(...closingDays) : 31;
+    const cicloFechou = (ym) => {
+      const sp = U.ymAdd(ym, -1); // mês de gasto dessa fatura
+      if (sp < ymAtual) return true;         // gasto num mês passado → já fechou
+      if (sp > ymAtual) return false;        // gasto num mês futuro → nem começou
+      return hoje > maxFech;                 // gasto no mês atual: fecha após o maior dia de fechamento
+    };
+    const ymBase = U.ymAdd(ymAtual, 1);
+    let ymCartoes = ymBase;
     let _gc = 0;
-    while (_gc++ < 6 && Store.faturaTotal(ymCartoes, null) > 0 && Store.faturaRestante(ymCartoes, null) === 0) {
-      ymCartoes = U.ymAdd(ymCartoes, 1);
-    }
+    while (_gc++ < 12 && cicloFechou(ymCartoes)) ymCartoes = U.ymAdd(ymCartoes, 1);
     const mesCartoes = U.ymParse(ymCartoes).m;
     const mesGastoCartoes = U.ymParse(U.ymAdd(ymCartoes, -1)).m;
-    const cartoes = st.accounts
-      .filter(a => a.type === "cartao")
+    const cartoesDoMes = st.accounts.filter(a => a.type === "cartao");
+    // Fatura vigente (aberta agora)
+    const cartoes = cartoesDoMes
       .map(a => {
         const total = Store.faturaTotal(ymCartoes, a.id);
         const restante = Store.faturaRestante(ymCartoes, a.id);
@@ -110,9 +119,16 @@ const ViewDashboard = (() => {
         return { id: a.id, name: a.name, dueDay: a.dueDay, total, restante, pago: !!pagoRec && restante === 0, pagoValor: pagoRec ? pagoRec.value : 0 };
       })
       .filter(c => c.total > 0)
-      // ainda a pagar primeiro (maior valor); os já pagos vão para o fim
       .sort((a, b) => (a.pago === b.pago ? b.restante - a.restante : (a.pago ? 1 : -1)));
-    const totalRestante = Math.round(cartoes.reduce((s, c) => s + c.restante, 0) * 100) / 100;
+    // Faturas que já fecharam e ainda têm saldo a pagar (vencidas) — continuam no "Em aberto".
+    const vencidas = [];
+    { let _gv = 0; for (let ym = ymBase; ym !== ymCartoes && _gv < 12; ym = U.ymAdd(ym, 1), _gv++) {
+      for (const a of cartoesDoMes) {
+        const rest = Store.faturaRestante(ym, a.id);
+        if (rest > 0) vencidas.push({ name: a.name, mes: U.ymParse(ym).m, restante: rest });
+      }
+    } }
+    const totalRestante = Math.round((cartoes.reduce((s, c) => s + c.restante, 0) + vencidas.reduce((s, v) => s + v.restante, 0)) * 100) / 100;
 
     // Composição da carteira: valor atual em Ações, FIIs e Renda fixa.
     // Ações/FIIs usam a cotação (mesma base do Patrimônio investido); renda fixa é o valor informado.
@@ -147,7 +163,9 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">💰 Saldo em conta <button class="btn-sm" id="btn-edit-conta" title="Atualizar saldo">✎</button></div>
           <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
-          <div class="stat-sub">${conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar"}</div>
+          <div class="stat-sub">${saldoConta != null && saldoConta < 0
+            ? `<span style="color:var(--critical);font-weight:600">⚠️ Cheque especial em uso: ${U.brl(Math.abs(saldoConta))}</span>`
+            : (conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar")}</div>
           <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
         </div>
         <div class="card stat stat-duplo clickable" data-goto="fluxo">
@@ -184,13 +202,18 @@ const ViewDashboard = (() => {
         </div>
       </div>
 
-      ${cartoes.length ? `
+      ${(cartoes.length || vencidas.length) ? `
       <div class="card mt">
         <div class="cartoes-head">
           <h2 class="section" style="margin:0">💳 Cartões de crédito — fatura de ${U.MESES[mesCartoes - 1]} <span class="muted" style="font-weight:400">(gastos de ${U.MESES[mesGastoCartoes - 1]})</span></h2>
           <a href="#cartoes" class="muted" style="font-size:12px;text-decoration:none">ver detalhes →</a>
         </div>
         <div class="cartoes-list" id="dash-cartoes">
+          ${vencidas.map(v => `
+            <div class="cartao-row clickable" data-goto="cartoes">
+              <span class="cartao-nome">${U.esc(v.name)} <span class="muted" style="font-weight:400">· fatura de ${U.MESES_ABREV[v.mes - 1]} a pagar</span></span>
+              <span class="num neg">${U.brl(v.restante)}</span>
+            </div>`).join("")}
           ${cartoes.map(c => `
             <div class="cartao-row clickable" data-goto="cartoes">
               <span class="cartao-nome">${U.esc(c.name)}${c.dueDay ? ` <span class="muted" style="font-weight:400">· dia ${c.dueDay}</span>` : ""}</span>
@@ -200,7 +223,7 @@ const ViewDashboard = (() => {
             </div>`).join("")}
         </div>
         <div class="cartoes-total">
-          <span>${totalRestante > 0 ? "Falta pagar" : "Tudo pago ✓"}</span>
+          <span>${totalRestante > 0 ? "Em aberto (a pagar)" : "Tudo pago ✓"}</span>
           <b class="num ${totalRestante > 0 ? "neg" : "pos"}">${U.brl(totalRestante)}</b>
         </div>
       </div>` : ""}
