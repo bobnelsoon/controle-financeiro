@@ -264,11 +264,25 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607194000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607194200`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#36 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#39 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Mês de trabalho global** (PUBLICADO, cache `202607194200`, PR #39): o usuário trabalha **um mês à frente**.
+O Dashboard inteiro (Receitas/Despesas/Resultado/Acumulado/Cartões) olha um único mês = `App.mesRef()`
+(padrão `Store.faturaVigenteYm`), com seletor **‹ Mês ›** (↺ volta ao automático). Lançamentos abre nesse mês;
+Fluxo destaca a coluna dele; vencimentos seguem a data real. Ver a seção "Mês de trabalho global" nas convenções.
+
+**Ideias combinadas com o usuário para as próximas (ainda NÃO feitas):**
+- **Pagar várias contas de uma vez** (variação da #3): ele NÃO paga tudo no mesmo dia, mas costuma pagar
+  ~4 contas juntas — então o ideal é **marcar um conjunto selecionado** de faturas/fixos como pago de uma vez
+  (não um "pagar tudo" cego).
+- **#4 Janela de pagamento (28→10)**: seção juntando o que vence entre o dia 28 e o 10 do mês seguinte.
+- **#5 Ponto mais baixo do saldo**: mostrar o saldo mínimo previsto ("chega a -R$ X no dia Y") por causa do
+  cheque especial. O usuário curtiu a ideia; fica pra frente.
+- Objetivo do usuário: deixar o app **100% até chegar agosto**, ajustando aos poucos.
 
 **Dividendos manuais + dashboard de cartões** (PUBLICADO, cache `202607194000`, PRs #29–#36):
 - **Dividendos**: não há fonte grátis de dividendo de FII no navegador (brapi grátis não traz; Yahoo/StatusInvest
