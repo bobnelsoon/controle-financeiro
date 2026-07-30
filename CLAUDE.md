@@ -107,6 +107,14 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     "⚠️ Cheque especial em uso: <valor>" (só aviso — o negativo já está embutido no saldo/projeção; não vira
     lançamento pra não contar em dobro).
   - `cardTx[].ym` guarda o mês de pagamento da fatura.
+  - **Mês de trabalho global** (`App.mesRef()`): o usuário trabalha **um mês à frente**, então o **Dashboard
+    inteiro** (Receitas/Despesas/Resultado/Acumulado/Cartões) olha **um único mês** — o `App.mesRef()`, padrão
+    = `Store.faturaVigenteYm()` (mês seguinte avançando na **data de fechamento** via `minFech`, ou se a fatura
+    já está paga). O Dashboard tem um seletor **‹ Mês ›** que navega (só na sessão, `navYm`; **↺** volta ao
+    automático). **Lançamentos** abre nesse mês (`mesSel` inicia em `App.mesRef()`) e o **Fluxo Anual** destaca
+    a coluna dele. Os **Próximos vencimentos** continuam ancorados na **data REAL** de hoje (não no mês de
+    trabalho). Substituiu o esquema antigo (topo no mês atual + Resultado/Cartões no mês+1) e o auto-advance
+    local dos cartões — agora tudo deriva de `mesRef`.
   - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init
     idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.
     `faturaRestante(ym, accountId)` = `faturaTotal − pago` (compras novas numa fatura já paga voltam a

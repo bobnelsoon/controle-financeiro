@@ -2,7 +2,7 @@
 "use strict";
 
 const ViewLancamentos = (() => {
-  let mesSel = U.ymHoje();
+  let mesSel = null; // abre no mês de trabalho (App.mesRef) na 1ª vez; navegação fica na sessão
 
   function abrirNovo() {
     const cartoesArr = Store.state.accounts.filter(a => a.type === "cartao");
@@ -110,6 +110,7 @@ const ViewLancamentos = (() => {
   }
 
   function render(root) {
+    if (mesSel == null) mesSel = App.mesRef();
     const txs = Store.txDoMes(mesSel);
     const total = txs.reduce((s, t) => s + t.value, 0);
 

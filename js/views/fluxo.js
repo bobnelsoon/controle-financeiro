@@ -165,7 +165,7 @@ const ViewFluxo = (() => {
     const st = Store.state;
     const meses = [];
     for (let m = 1; m <= 12; m++) meses.push(U.ym(ano, m));
-    const ymAtual = U.ymHoje();
+    const ymAtual = App.mesRef(); // destaca a coluna do mês de trabalho
 
     root.innerHTML = `
       <div class="page-head">

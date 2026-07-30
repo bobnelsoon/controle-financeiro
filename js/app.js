@@ -38,6 +38,15 @@ const App = (() => {
   const CTRL_KEY = "gestao-controle-ativo";
   let controleAtivo = null;
 
+  // "Mês de trabalho" global: o usuário trabalha um mês à frente. Por padrão é a FATURA VIGENTE
+  // (Store.faturaVigenteYm — mês seguinte, avançando na data de fechamento). O seletor no Dashboard
+  // navega meses (só na sessão; ao reabrir volta ao mês de trabalho automático).
+  let navYm = null;
+  function mesRef() { return navYm || Store.faturaVigenteYm(); }
+  function mesRefShift(delta) { navYm = U.ymAdd(mesRef(), delta); render(); }
+  function mesRefReset() { navYm = null; render(); }
+  function mesRefAuto() { return navYm == null; }
+
   function ctrl() { return controles[controleAtivo] || controles.financeiro; }
 
   function rotaAtual() {
@@ -131,7 +140,7 @@ const App = (() => {
     Sync.init(); // baixa alterações feitas em outro aparelho (se a sincronização estiver ativa)
   }
 
-  return { render, boot, trocarControle };
+  return { render, boot, trocarControle, mesRef, mesRefShift, mesRefReset, mesRefAuto };
 })();
 
 document.addEventListener("DOMContentLoaded", App.boot);
