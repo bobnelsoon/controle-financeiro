@@ -291,6 +291,28 @@ const Store = (() => {
     return rest !== 0 ? -rest : null;
   }
 
+  // Mês da FATURA VIGENTE (a que o usuário está pagando agora) = mês seguinte ao atual, avançando
+  // na DATA DE FECHAMENTO: assim que o 1º cartão fecha (menor closingDay) o ciclo do mês vira, ou se
+  // a fatura já está toda paga. É o "mês de trabalho" padrão do app (o usuário trabalha um mês à frente).
+  function faturaVigenteYm() {
+    const ymAtual = U.ymHoje();
+    const cartoes = (state.accounts || []).filter(a => a.type === "cartao");
+    const closingDays = cartoes.filter(a => a.closingDay).map(a => Number(a.closingDay));
+    const minFech = closingDays.length ? Math.min(...closingDays) : 31;
+    const diaHoje = new Date().getDate();
+    const fechou = (ym) => {
+      const sp = U.ymAdd(ym, -1); // mês de gasto dessa fatura
+      if (sp < ymAtual) return true;
+      if (sp > ymAtual) return false;
+      return diaHoje >= minFech;
+    };
+    let ym = U.ymAdd(ymAtual, 1), g = 0;
+    while (g++ < 12 && (fechou(ym) || (faturaTotal(ym, null) > 0 && faturaRestante(ym, null) === 0))) {
+      ym = U.ymAdd(ym, 1);
+    }
+    return ym;
+  }
+
   // Valor planejado do mês (ignora status) — usado no painel do mês
   function plannedValue(item, ymStr) {
     const c = getCell(item.id, ymStr);
@@ -848,7 +870,7 @@ const Store = (() => {
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
-    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante,
+    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm,
     inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,

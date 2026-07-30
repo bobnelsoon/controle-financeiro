@@ -3,12 +3,15 @@
 
 const ViewDashboard = (() => {
   function render(root) {
-    const ymAtual = U.ymHoje();
-    const { y: ano, m: mes } = U.ymParse(ymAtual);
     const st = Store.state;
+    // Mês de trabalho global: o usuário trabalha um mês à frente. O Dashboard INTEIRO olha esse mês
+    // (padrão = fatura vigente; navegável pelo seletor ‹ ›). Assim os cards não ficam em meses diferentes.
+    const ymRef = App.mesRef();
+    const ymAtual = ymRef;
+    const { y: ano, m: mes } = U.ymParse(ymAtual);
 
-    // Fatura vigente = o que você gastou agora, pago no mês seguinte
-    const ymFatura = U.ymAdd(ymAtual, 1);
+    // Fatura vigente = a fatura do mês de trabalho
+    const ymFatura = ymRef;
     const mesFatura = U.ymParse(ymFatura).m;
     const gastoCartao = Store.faturaRestante(ymFatura, null); // positivo = fatura que ainda falta pagar
 
@@ -57,12 +60,13 @@ const ViewDashboard = (() => {
     const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
-    // Próximos vencimentos: do mês atual até dezembro, agrupados por mês.
-    // Inclui itens do fluxo com dia definido (ainda pendentes) e parcelas de empréstimos em aberto.
+    // Próximos vencimentos: do mês REAL de hoje até dezembro (independe do mês de trabalho),
+    // agrupados por mês. Itens do fluxo com dia definido (ainda pendentes) + parcelas de empréstimos.
     const hoje = new Date().getDate();
+    const { y: anoReal, m: mesReal } = U.ymParse(U.ymHoje());
     const gruposVenc = [];
-    for (let mm = mes; mm <= 12; mm++) {
-      const ymStr = U.ym(ano, mm);
+    for (let mm = mesReal; mm <= 12; mm++) {
+      const ymStr = U.ym(anoReal, mm);
       const lista = [];
       for (const it of st.flowItems) {
         if (it.dueDay == null || it.dueDay === "") continue;
@@ -71,7 +75,7 @@ const ViewDashboard = (() => {
         const c = Store.getCell(it.id, ymStr);
         if (c && c.status && c.status !== "PENDENTE") continue; // já pago/recebido
         lista.push({
-          dia: U.diaVencimento(it.dueDay, ano, mm),
+          dia: U.diaVencimento(it.dueDay, anoReal, mm),
           nome: it.name,
           valor: Math.abs(v),
           tipo: v > 0 ? "Receber" : "Pagar",
@@ -87,31 +91,17 @@ const ViewDashboard = (() => {
       }
       if (!lista.length) continue;
       lista.sort((a, b) => a.dia - b.dia);
-      if (mm === mes) for (const v of lista) v.atrasado = v.dia < hoje;
+      if (mm === mesReal) for (const v of lista) v.atrasado = v.dia < hoje;
       const total = lista.reduce((s, v) => s + (v.tipo === "Receber" ? v.valor : -v.valor), 0);
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — o quadro avança na DATA DE FECHAMENTO: assim que o ciclo do mês começa a
-    // fechar (primeiro cartão fecha), passa a mostrar a fatura do mês seguinte, mesmo sem ter pago
-    // tudo. Faturas que fecharam e ainda têm saldo continuam como linhas "a pagar" no total "Em
-    // aberto". Também avança se a fatura do mês já estiver totalmente paga.
-    const closingDays = st.accounts.filter(a => a.type === "cartao" && a.closingDay).map(a => Number(a.closingDay));
-    const minFech = closingDays.length ? Math.min(...closingDays) : 31;
-    const cicloFechou = (ym) => {
-      const sp = U.ymAdd(ym, -1); // mês de gasto dessa fatura
-      if (sp < ymAtual) return true;         // gasto num mês passado → já fechou
-      if (sp > ymAtual) return false;        // gasto num mês futuro → nem começou
-      return hoje >= minFech;                // gasto no mês atual: fecha a partir do 1º dia de fechamento
-    };
-    const ymBase = U.ymAdd(ymAtual, 1);
-    let ymCartoes = ymBase;
-    let _gc = 0;
-    while (_gc++ < 12 && (cicloFechou(ymCartoes) || (Store.faturaTotal(ymCartoes, null) > 0 && Store.faturaRestante(ymCartoes, null) === 0))) ymCartoes = U.ymAdd(ymCartoes, 1);
+    // Cartões de crédito — a fatura do MÊS DE TRABALHO (ymRef). Faturas de meses anteriores ainda
+    // não pagas aparecem como linhas "a pagar" (vencidas) e somam no total "Em aberto".
+    const ymCartoes = ymRef;
     const mesCartoes = U.ymParse(ymCartoes).m;
     const mesGastoCartoes = U.ymParse(U.ymAdd(ymCartoes, -1)).m;
     const cartoesDoMes = st.accounts.filter(a => a.type === "cartao");
-    // Fatura vigente (aberta agora)
     const cartoes = cartoesDoMes
       .map(a => {
         const total = Store.faturaTotal(ymCartoes, a.id);
@@ -121,9 +111,9 @@ const ViewDashboard = (() => {
       })
       .filter(c => c.total > 0)
       .sort((a, b) => (a.pago === b.pago ? b.restante - a.restante : (a.pago ? 1 : -1)));
-    // Faturas que já fecharam e ainda têm saldo a pagar (vencidas) — continuam no "Em aberto".
+    // Faturas de meses anteriores ao mês de trabalho ainda com saldo (vencidas) — continuam no "Em aberto".
     const vencidas = [];
-    { let _gv = 0; for (let ym = ymBase; ym !== ymCartoes && _gv < 12; ym = U.ymAdd(ym, 1), _gv++) {
+    { let _gv = 0; for (let ym = U.ymAdd(ymCartoes, -4); ym !== ymCartoes && _gv < 8; ym = U.ymAdd(ym, 1), _gv++) {
       for (const a of cartoesDoMes) {
         const rest = Store.faturaRestante(ym, a.id);
         if (rest > 0) vencidas.push({ name: a.name, mes: U.ymParse(ym).m, restante: rest });
@@ -155,7 +145,12 @@ const ViewDashboard = (() => {
     root.innerHTML = `
       <div class="page-head">
         <h1>Dashboard</h1>
-        <span class="muted">${U.MESES[mes - 1]} de ${ano}</span>
+        <div style="display:flex;align-items:center;gap:4px" title="Mês de trabalho">
+          <button class="btn-sm" id="mes-prev" aria-label="Mês anterior">‹</button>
+          <span class="muted" style="min-width:104px;text-align:center;font-weight:600">${U.MESES[mes - 1]} ${ano}</span>
+          <button class="btn-sm" id="mes-next" aria-label="Próximo mês">›</button>
+          ${App.mesRefAuto() ? "" : `<button class="btn-sm" id="mes-hoje" title="Voltar ao mês de trabalho">↺</button>`}
+        </div>
         <div class="spacer"></div>
         <span class="muted" id="dash-sync-info" style="font-size:11.5px">${typeof Sync !== "undefined" ? U.esc(Sync.statusTexto()) : ""}</span>
         <button class="btn-primary" id="btn-atualizar">🔄 Atualizar</button>
@@ -170,7 +165,7 @@ const ViewDashboard = (() => {
           <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
         </div>
         <div class="card stat stat-duplo clickable" data-goto="fluxo">
-          <div class="stat-label">Receitas do mês</div>
+          <div class="stat-label">Receitas de ${U.MESES[mes - 1]}</div>
           <div class="stat-value pos num">${U.brl(receitas)}</div>
           <div class="stat-sub">fixas + lançamentos</div>
           ${disponivelMes != null ? `
@@ -181,7 +176,7 @@ const ViewDashboard = (() => {
           </div>` : ""}
         </div>
         <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Despesas do mês</div>
+          <div class="stat-label">Despesas de ${U.MESES[mes - 1]}</div>
           <div class="stat-value neg num">${U.brl(despesas)}</div>
           <div class="stat-sub">fixas + lançamentos + fatura do cartão</div>
         </div>
@@ -275,6 +270,12 @@ const ViewDashboard = (() => {
     root.querySelectorAll(".clickable[data-goto]").forEach(card => {
       card.addEventListener("click", () => { location.hash = "#" + card.dataset.goto; });
     });
+
+    // Navegação do mês de trabalho
+    root.querySelector("#mes-prev").addEventListener("click", () => App.mesRefShift(-1));
+    root.querySelector("#mes-next").addEventListener("click", () => App.mesRefShift(1));
+    const btnMesHoje = root.querySelector("#mes-hoje");
+    if (btnMesHoje) btnMesHoje.addEventListener("click", () => App.mesRefReset());
 
     // 🔄 Atualizar tudo: sincroniza com o cofre + busca cotações + recalcula as telas
     root.querySelector("#btn-atualizar").addEventListener("click", async (e) => {
