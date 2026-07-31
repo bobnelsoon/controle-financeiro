@@ -183,13 +183,13 @@ const ViewDashboard = (() => {
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Resultado de ${U.MESES[mesFatura - 1]}</div>
           <div class="stat-value num ${U.clsValor(saldoMes)}">${U.brl(saldoMes)}</div>
-          <div class="stat-sub">receitas − despesas previstas de ${U.MESES[mesFatura - 1]}</div>
+          <div class="stat-sub">a receber − a pagar do mês (não inclui o saldo atual)</div>
         </div>
         ${acumulado != null ? `
         <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Acumulado de ${U.MESES[mesFatura - 1]}</div>
+          <div class="stat-label">No fim de ${U.MESES[mesFatura - 1]} (previsto)</div>
           <div class="stat-value num ${U.clsValor(acumulado)}">${U.brl(acumulado)}</div>
-          <div class="stat-sub">saldo previsto na conta no fim de ${U.MESES[mesFatura - 1]}</div>
+          <div class="stat-sub">saldo ${saldoConta != null && saldoConta < 0 ? "negativo" : "atual"} + a receber − a pagar</div>
         </div>` : ""}
         <div class="card stat clickable" data-goto="fluxo">
           <div class="stat-label">Saldo projetado (Dez/${ano})</div>

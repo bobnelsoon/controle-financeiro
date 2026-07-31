@@ -144,10 +144,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 - **Acumulado (Dashboard) = saldo previsto na conta no FIM do PRÓXIMO mês**, não `saldo + resultado`.
   É `saldoProjecaoSerie().find(p => p.ym === ymFatura).saldo`: parte do `saldoContaAtual` e soma **só o
-  que ainda falta** (itens já Pagos/Recebidos contam 0, pois já estão embutidos no saldo). **Decisão
-  importante:** `saldo + resultado` contava em dobro os itens já quitados. Com o mês todo quitado, o
-  Acumulado tende ao próprio saldo. "Resultado" e "Acumulado" medem coisas diferentes e **não** se
-  somam ("como foi o mês" vs "quanto vou ter na conta").
+  que ainda falta** (itens já Pagos/Recebidos contam 0, pois já estão embutidos no saldo) **+ os
+  empréstimos ABERTOS a receber no mês** (`loansAReceberMes` — não estão nos flowItems; as parcelas já
+  PAGAS já entram no saldo). Assim o Acumulado = `saldo (± cheque especial) + a receber (fixos + empréstimos)
+  − a pagar`, exatamente o "quanto vou ter no fim do mês". **Decisão importante:** `saldo + resultado`
+  contava em dobro os itens já quitados. "Resultado" (a receber − a pagar do mês, **sem** o saldo e **sem**
+  empréstimos) e "Acumulado" medem coisas diferentes e **não** se somam. No Dashboard o card do fim do mês
+  chama-se **"No fim de <mês> (previsto)"** com subtítulo "saldo + a receber − a pagar".
 
 - **Compras parceladas no cartão**: cada parcela é um `cardTx` separado (um por mês, `desc` com sufixo
   ` NN/MM`). Parcelas novas compartilham um `groupId`. Excluir uma parcela oferece **"Excluir todas as
@@ -155,7 +158,8 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   `groupId` ou, no fallback (compras antigas sem groupId), pela descrição base + mesmo cartão.
 
 - **Projeção do saldo** (`Store.saldoProjecaoSerie`): começa no `saldoContaAtual` e projeta do mês atual
-  até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0). Alimenta o
+  até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0) **+
+  `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). Alimenta o
   gráfico do dashboard, o "Saldo projetado (Dez)", o "Acumulado do mês" (`[0]`) e, via
   `Store.saldoAcumuladoSerie(ano)`, a linha **"Saldo acumulado" do Fluxo Anual** (mesma projeção; meses
   já realizados ficam em branco; sem saldo informado cai no `saldoSerie` antigo estilo planilha).

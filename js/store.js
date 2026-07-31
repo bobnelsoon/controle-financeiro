@@ -347,6 +347,19 @@ const Store = (() => {
     return t;
   }
 
+  // Parcelas de empréstimo AINDA A RECEBER (ABERTO) que vencem no mês — dinheiro que vai entrar na
+  // conta. Não estão nos flowItems (o empréstimo é uma estrutura à parte), então precisam ser somadas
+  // à parte na projeção do saldo (as PAGAS já entram no saldoContaAtual; contamos só as ABERTAS).
+  function loansAReceberMes(ymStr) {
+    let t = 0;
+    for (const l of state.loans) {
+      for (const p of (l.items || [])) {
+        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymStr) t += (p.value || 0);
+      }
+    }
+    return Math.round(t * 100) / 100;
+  }
+
   // Saldo acumulado.
   // Se o usuário informou o saldo em conta (settings.conta = {ym, valor}), a projeção
   // parte desse valor real: saldo(mês âncora) = valor informado + pendências do próprio mês.
@@ -384,7 +397,8 @@ const Store = (() => {
     let s = base != null ? base : 0;
     let cur = start;
     while (U.ymCmp(cur, fim) <= 0) {
-      s += monthTotal(cur); // projectedValue: Pago/Recebido = 0
+      // projectedValue: Pago/Recebido = 0. Soma também os empréstimos ABERTOS a receber no mês.
+      s += monthTotal(cur) + loansAReceberMes(cur);
       serie.push({ ym: cur, saldo: Math.round(s * 100) / 100 });
       cur = U.ymAdd(cur, 1);
     }
@@ -447,7 +461,7 @@ const Store = (() => {
     let s = base;
     let cur = start;
     while (U.ymCmp(cur, fimAno) <= 0) {
-      s = Math.round((s + monthTotal(cur)) * 100) / 100;
+      s = Math.round((s + monthTotal(cur) + loansAReceberMes(cur)) * 100) / 100;
       map[cur] = s;
       cur = U.ymAdd(cur, 1);
     }
