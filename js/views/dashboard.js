@@ -10,54 +10,25 @@ const ViewDashboard = (() => {
     const ymAtual = ymRef;
     const { y: ano, m: mes } = U.ymParse(ymAtual);
 
-    // Fatura vigente = a fatura do mês de trabalho
-    const ymFatura = ymRef;
-    const mesFatura = U.ymParse(ymFatura).m;
-    const gastoCartao = Store.faturaRestante(ymFatura, null); // positivo = fatura que ainda falta pagar
-
-    // Receitas/despesas do mês: itens do fluxo + lançamentos avulsos.
-    // O item "Cartão (fatura)" é ignorado aqui porque o gasto do cartão entra pela
-    // fatura vigente (gastoCartao), evitando contar a fatura do mês já paga em dobro.
-    let receitas = 0, despesas = 0;
-    for (const it of st.flowItems) {
-      if (it.autoCartao) continue;
-      const v = Store.plannedValue(it, ymAtual);
-      if (v == null) continue;
-      if (v > 0) receitas += v; else despesas += v;
-    }
-    for (const t of Store.txDoMes(ymAtual)) {
-      if (t.value > 0) receitas += t.value; else despesas += t.value;
-    }
-    despesas -= gastoCartao; // inclui o gasto real do cartão como despesa do mês
-    // Resultado e Acumulado olham para o PRÓXIMO mês (ymFatura), porque o mês atual costuma já
-    // estar quitado (resultado 0) e a fatura do cartão do mês atual só é paga no mês seguinte.
-    // Resultado do próximo mês = o que está previsto acontecer nele (monthTotal/projectedValue).
-    const saldoMes = Store.monthTotal(ymFatura);
-    const serie = Store.saldoProjecaoSerie();
-    const saldoDez = serie.length ? serie[serie.length - 1].saldo : 0;
+    const serie = Store.saldoProjecaoSerie(); // alimenta o gráfico de projeção
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
-    // Disponível olha o PRÓXIMO mês (ymFatura), igual à fatura/Resultado/Acumulado — o usuário
-    // trabalha sempre com o mês seguinte. "A receber" = receitas fixas do fluxo ainda pendentes +
-    // parcelas de empréstimo (ABERTO) que vencem no próximo mês. Itens já recebidos e lançamentos
-    // NÃO entram (já estão embutidos no saldo), então o número não infla à toa.
-    let receitasAReceberProx = 0;
+
+    // Quadro "A receber / A pagar" do mês de trabalho — só o que AINDA falta (do fluxo):
+    //  - A receber = receita fixa pendente + empréstimos ABERTOS a receber no mês.
+    //  - A pagar   = despesa fixa pendente + fatura restante do cartão (o item "Cartão (fatura)"
+    //    já entra como negativo pelo projectedValue).
+    // Marcar Recebido/Pago tira o item do quadro e mexe no saldo — o "No fim do mês" fica estável.
+    let aReceber = 0, aPagar = 0;
     for (const it of st.flowItems) {
-      if (it.autoCartao) continue;
-      const proj = Store.projectedValue(it, ymFatura);
-      if (proj != null && proj > 0) receitasAReceberProx += proj;
+      const v = Store.projectedValue(it, ymRef);
+      if (v == null) continue;
+      if (v > 0) aReceber += v; else aPagar += -v;
     }
-    let emprestimosAReceberProx = 0;
-    for (const l of st.loans) {
-      for (const p of (l.items || [])) {
-        if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymFatura) emprestimosAReceberProx += (p.value || 0);
-      }
-    }
-    const aReceberProx = Math.round((receitasAReceberProx + emprestimosAReceberProx) * 100) / 100;
-    const disponivelMes = saldoConta != null ? Math.round((saldoConta + aReceberProx) * 100) / 100 : null;
-    // Acumulado = saldo previsto na conta no FIM do próximo mês (ponto da projeção em ymFatura).
-    const pProx = serie.find(p => p.ym === ymFatura);
-    const acumulado = saldoConta != null && pProx ? pProx.saldo : null;
+    aReceber = Math.round((aReceber + Store.loansAReceberMes(ymRef)) * 100) / 100;
+    aPagar = Math.round(aPagar * 100) / 100;
+    // "No fim do mês (previsto)" = saldo em conta + a receber − a pagar.
+    const fimMes = saldoConta != null ? Math.round((saldoConta + aReceber - aPagar) * 100) / 100 : null;
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
     // Próximos vencimentos: do mês REAL de hoje até dezembro (independe do mês de trabalho),
@@ -163,6 +134,21 @@ const ViewDashboard = (() => {
             ? `<span style="color:var(--critical);font-weight:600">⚠️ Cheque especial em uso: ${U.brl(Math.abs(saldoConta))}</span>`
             : (conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar")}</div>
           <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
+        </div>
+        <div class="card stat stat-duplo clickable" data-goto="fluxo">
+          <div class="stat-label">A receber em ${U.MESES[mes - 1]}</div>
+          <div class="stat-value pos num">${U.brl(aReceber)}</div>
+          <div class="stat-sub">receita fixa + empréstimo (o que ainda falta)</div>
+          <div class="stat-linha2">
+            <div class="stat-label">A pagar em ${U.MESES[mes - 1]}</div>
+            <div class="stat-value neg num">${U.brl(-aPagar)}</div>
+            <div class="stat-sub">despesa fixa + fatura (o que ainda falta)</div>
+          </div>
+        </div>
+        <div class="card stat clickable" data-goto="fluxo">
+          <div class="stat-label">No fim de ${U.MESES[mes - 1]} (previsto)</div>
+          <div class="stat-value num ${fimMes != null ? U.clsValor(fimMes) : "muted"}">${fimMes != null ? U.brl(fimMes) : "informe o saldo"}</div>
+          <div class="stat-sub">saldo em conta + a receber − a pagar</div>
         </div>
       </div>
 
