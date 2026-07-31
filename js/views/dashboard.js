@@ -164,38 +164,6 @@ const ViewDashboard = (() => {
             : (conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar")}</div>
           <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
         </div>
-        <div class="card stat stat-duplo clickable" data-goto="fluxo">
-          <div class="stat-label">Receitas de ${U.MESES[mes - 1]}</div>
-          <div class="stat-value pos num">${U.brl(receitas)}</div>
-          <div class="stat-sub">fixas + lançamentos</div>
-          ${disponivelMes != null ? `
-          <div class="stat-linha2">
-            <div class="stat-label">Disponível em ${U.MESES[mesFatura - 1]}</div>
-            <div class="stat-value num ${U.clsValor(disponivelMes)}">${U.brl(disponivelMes)}</div>
-            <div class="stat-sub">saldo + receitas e empréstimos a receber de ${U.MESES[mesFatura - 1]}</div>
-          </div>` : ""}
-        </div>
-        <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Despesas de ${U.MESES[mes - 1]}</div>
-          <div class="stat-value neg num">${U.brl(despesas)}</div>
-          <div class="stat-sub">fixas + lançamentos + fatura do cartão</div>
-        </div>
-        <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Resultado de ${U.MESES[mesFatura - 1]}</div>
-          <div class="stat-value num ${U.clsValor(saldoMes)}">${U.brl(saldoMes)}</div>
-          <div class="stat-sub">a receber − a pagar do mês (não inclui o saldo atual)</div>
-        </div>
-        ${acumulado != null ? `
-        <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">No fim de ${U.MESES[mesFatura - 1]} (previsto)</div>
-          <div class="stat-value num ${U.clsValor(acumulado)}">${U.brl(acumulado)}</div>
-          <div class="stat-sub">saldo ${saldoConta != null && saldoConta < 0 ? "negativo" : "atual"} + a receber − a pagar</div>
-        </div>` : ""}
-        <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">Saldo projetado (Dez/${ano})</div>
-          <div class="stat-value num ${U.clsValor(saldoDez)}">${U.brl(saldoDez)}</div>
-          <div class="stat-sub">${conta ? "a partir do saldo em conta" : "projeção do fluxo anual"}</div>
-        </div>
       </div>
 
       ${(cartoes.length || vencidas.length) ? `
