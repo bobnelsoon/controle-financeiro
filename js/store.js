@@ -349,6 +349,28 @@ const Store = (() => {
     return t;
   }
 
+  // Receita e despesa TOTAIS (cheias, valores do fluxo) de um mês — para o gráfico receita x despesa.
+  // Usa plannedValue (ignora status, mostra o total planejado). A fatura entra pela cheia do mês.
+  function receitaDespesaMes(ymStr) {
+    let receita = 0, despesa = 0;
+    for (const it of state.flowItems) {
+      if (it.autoCartao) { despesa += faturaTotal(ymStr, null); continue; }
+      const v = plannedValue(it, ymStr);
+      if (v == null) continue;
+      if (v > 0) receita += v; else despesa += -v;
+    }
+    return { receita: Math.round(receita * 100) / 100, despesa: Math.round(despesa * 100) / 100 };
+  }
+  function receitaDespesaSerie(ano) {
+    const serie = [];
+    for (let m = 1; m <= 12; m++) {
+      const ym = U.ym(ano, m);
+      const rd = receitaDespesaMes(ym);
+      serie.push({ ym, receita: rd.receita, despesa: rd.despesa });
+    }
+    return serie;
+  }
+
   // Parcelas de empréstimo AINDA A RECEBER (ABERTO) que vencem no mês — dinheiro que vai entrar na
   // conta. Não estão nos flowItems (o empréstimo é uma estrutura à parte), então precisam ser somadas
   // à parte na projeção do saldo (as PAGAS já entram no saldoContaAtual; contamos só as ABERTAS).
@@ -887,7 +909,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
