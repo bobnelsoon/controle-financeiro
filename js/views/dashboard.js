@@ -18,6 +18,10 @@ const ViewDashboard = (() => {
     const rdTotDespesa = Math.round(rdSerie.reduce((s, p) => s + p.despesa, 0) * 100) / 100;
     const rdDif = Math.round((rdTotReceita - rdTotDespesa) * 100) / 100;
     const brlCheio = v => "R$ " + Math.round(Math.abs(v)).toLocaleString("pt-BR"); // sem centavos
+    // Previsão de saldo no fim do ano = saldo de dezembro da cascata (o MESMO "Saldo fim" de dez da
+    // tabela "Próximos meses"). Amarra o gráfico ao fluxo: saldo de hoje + resultado + empréstimos.
+    const rdCascata = Store.fluxoCascataSerie(ano);
+    const fimAno = rdCascata[U.ym(ano, 12)] ? rdCascata[U.ym(ano, 12)].end : null;
 
     // Quadro "A receber / A pagar" do mês de trabalho — só o que AINDA falta (do fluxo):
     //  - A receber = receita fixa pendente + empréstimos ABERTOS a receber no mês.
@@ -208,8 +212,13 @@ const ViewDashboard = (() => {
         <div style="display:flex;gap:8px;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:center">
           <div style="flex:1"><div class="muted" style="font-size:11px">Receita</div><div class="num pos" style="font-size:13.5px;font-weight:700;white-space:nowrap">${brlCheio(rdTotReceita)}</div></div>
           <div style="flex:1"><div class="muted" style="font-size:11px">Despesa</div><div class="num neg" style="font-size:13.5px;font-weight:700;white-space:nowrap">${brlCheio(rdTotDespesa)}</div></div>
-          <div style="flex:1"><div class="muted" style="font-size:11px">Diferença</div><div class="num ${rdDif >= 0 ? "pos" : "neg"}" style="font-size:13.5px;font-weight:700;white-space:nowrap">${rdDif >= 0 ? "+" : "−"}${brlCheio(rdDif)}</div></div>
+          <div style="flex:1"><div class="muted" style="font-size:11px">Resultado do ano</div><div class="num ${rdDif >= 0 ? "pos" : "neg"}" style="font-size:13.5px;font-weight:700;white-space:nowrap">${rdDif >= 0 ? "+" : "−"}${brlCheio(rdDif)}</div></div>
         </div>
+        ${fimAno != null ? `
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <span class="muted" style="font-size:12px">📆 No fim de ${ano} você terá <span style="font-size:10.5px">(saldo de hoje + resultado + empréstimos)</span></span>
+          <b class="num ${U.clsValor(fimAno)}" style="font-size:15px;white-space:nowrap">${U.brl(fimAno)}</b>
+        </div>` : ""}
       </div>
       <div class="card mt">
         <h2 class="section">Próximos meses <span class="muted" style="font-weight:400;font-size:12px">· projeção do saldo</span></h2>
