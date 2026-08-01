@@ -328,8 +328,10 @@ const Store = (() => {
   // Valor para projeção de saldo: célula PAGO/RECEBIDO sem valor vale 0 (igual à planilha)
   function projectedValue(item, ymStr) {
     const c = getCell(item.id, ymStr);
-    if (c && c.value != null) return c.value;
+    // Marcado como Pago/Recebido NÃO conta mais na projeção — mesmo que tenha valor digitado no mês
+    // (o valor já foi para o saldo via settledValue). Por isso o status vem ANTES do valor.
     if (c && c.status && c.status !== "PENDENTE") return 0;
+    if (c && c.value != null) return c.value;
     if (item.autoCartao) {
       const v = autoCartaoValue(ymStr);
       if (v != null) return v;
