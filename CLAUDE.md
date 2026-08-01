@@ -272,16 +272,26 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607194200`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607194700`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#39 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#45 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
 
 **Mês de trabalho global** (PUBLICADO, cache `202607194200`, PR #39): o usuário trabalha **um mês à frente**.
-O Dashboard inteiro (Receitas/Despesas/Resultado/Acumulado/Cartões) olha um único mês = `App.mesRef()`
-(padrão `Store.faturaVigenteYm`), com seletor **‹ Mês ›** (↺ volta ao automático). Lançamentos abre nesse mês;
-Fluxo destaca a coluna dele; vencimentos seguem a data real. Ver a seção "Mês de trabalho global" nas convenções.
+O Dashboard inteiro olha um único mês = `App.mesRef()` (padrão `Store.faturaVigenteYm`), com seletor **‹ Mês ›**
+(↺ volta ao automático). Lançamentos abre nesse mês; Fluxo destaca a coluna dele; vencimentos seguem a data
+real. Ver a seção "Mês de trabalho global" nas convenções.
+
+**Dashboard reformulado + correção de cálculo** (PUBLICADO, cache `202607194700`, PRs #42–#45):
+- Topo do Dashboard **enxuto**: **Saldo em conta**, **A receber / A pagar** do mês (pendentes: receita fixa +
+  empréstimo / despesa fixa + fatura) e **No fim de <mês> (previsto)** = `saldo + a receber − a pagar`.
+  Marcar Pago/Recebido tira do quadro e mexe no saldo → o "No fim" fica estável (sem contar em dobro).
+- **BUG corrigido** (PR #44): `projectedValue` checava o VALOR antes do STATUS — item com valor próprio no mês
+  marcado Pago/Recebido continuava somando no Resultado (Fluxo) e inflava o Dashboard. Agora **status vem
+  antes do valor** → marcado conta 0 mesmo com valor digitado. Ver a convenção "Resultado do mês".
+- **Fluxo Anual**: a linha virou **"Saldo na conta (fim do mês)"** e **não acumula** — cada mês = `saldo hoje +
+  resultado só daquele mês`. Ver convenção "Projeção do saldo".
 
 **Ideias combinadas com o usuário para as próximas (ainda NÃO feitas):**
 - **Pagar várias contas de uma vez** (variação da #3): ele NÃO paga tudo no mesmo dia, mas costuma pagar
