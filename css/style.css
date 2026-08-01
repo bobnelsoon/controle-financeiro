@@ -185,6 +185,16 @@ body {
 .venc-itens { display: none; padding-left: 2px; }
 .venc-group.open > .venc-itens { display: block; }
 
+/* Próximos meses (mini-tabela de projeção): cabe sem rolagem horizontal e expande o mês ao tocar */
+table.tbl.tbl-proj { min-width: 0; font-size: 12.5px; }
+.tbl-proj th, .tbl-proj td { padding: 8px 5px; }
+.tbl-proj .proj-row { cursor: pointer; }
+.tbl-proj .proj-row .chev { display: inline-block; color: var(--muted); font-size: 11px; transition: transform .15s; }
+.tbl-proj .proj-row.open .chev { transform: rotate(90deg); }
+.tbl-proj .proj-row.open > td { border-bottom: none; }
+.tbl-proj .proj-det > td { padding: 2px 5px 8px; }
+.tbl-proj .proj-det .list-row { border-bottom: 1px dashed var(--grid); }
+
 /* Cartões no dashboard: lista compacta em colunas (nome — valor) */
 .cartoes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .cartoes-head a:hover { color: var(--accent); }
