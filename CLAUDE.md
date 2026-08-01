@@ -162,11 +162,12 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 - **Projeção do saldo** (`Store.saldoProjecaoSerie`): começa no `saldoContaAtual` e projeta do mês atual
   até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0) **+
-  `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). Alimenta o
-  gráfico do dashboard, o "Saldo projetado (Dez)", o "Acumulado do mês" (`[0]`) e, via
-  `Store.saldoAcumuladoSerie(ano)`, a linha **"Saldo acumulado" do Fluxo Anual** (mesma projeção; meses
-  já realizados ficam em branco; sem saldo informado cai no `saldoSerie` antigo estilo planilha).
-  O `Store.saldoSerie` (acumula desde janeiro) só é usado nesse fallback e em `saldoAcumuladoAte`.
+  `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). Alimenta o **gráfico** do dashboard.
+  ⚠️ A linha do **Fluxo Anual chama-se "Saldo na conta (fim do mês)" e NÃO acumula** (decisão do usuário —
+  a soma empilhada dava um número irreal lá na frente): cada mês = `saldoContaAtual + monthTotal(mês) +
+  loansAReceberMes(mês)` (saldo de hoje + o resultado só daquele mês), calculado direto no `fluxo.js`
+  (não usa mais `saldoAcumuladoSerie`); meses antes do atual ou sem saldo informado ficam em branco.
+  `Store.saldoAcumuladoSerie`/`saldoSerie` seguem no store (sem uso no fluxo agora).
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
