@@ -36,25 +36,28 @@ const ViewDashboard = (() => {
     const fimMes = saldoConta != null ? Math.round((saldoConta + aReceber - aPagar) * 100) / 100 : null;
     const patrimonio = Store.rvTotal() + Store.rfTotal();
 
-    // Próximos vencimentos: do mês REAL de hoje até dezembro (independe do mês de trabalho),
-    // agrupados por mês. Itens do fluxo com dia definido (ainda pendentes) + parcelas de empréstimos.
+    // Próximos meses: do mês REAL de hoje até dezembro (independe do mês de trabalho). Segue a CASCATA
+    // do fluxo — Entra = receitas pendentes + empréstimo; Sai = despesas pendentes + FATURA do cartão;
+    // Saldo fim = saldo início + Entra − Sai (= "No fim de <mês>", encadeia mês a mês). Usa
+    // projectedValue (itens Pago/Recebido contam 0, a fatura entra via autoCartao) pra bater com a cascata.
     const hoje = new Date().getDate();
     const { y: anoReal, m: mesReal } = U.ymParse(U.ymHoje());
+    const cascataVenc = Store.fluxoCascataSerie(anoReal);
     const gruposVenc = [];
     for (let mm = mesReal; mm <= 12; mm++) {
       const ymStr = U.ym(anoReal, mm);
       const lista = [];
+      let entra = 0, sai = 0;
       for (const it of st.flowItems) {
-        if (it.autoCartao) continue; // a fatura entra pelo quadro de cartões
-        const v = Store.plannedValue(it, ymStr);
-        if (v == null || v === 0) continue;
-        const c = Store.getCell(it.id, ymStr);
-        if (c && c.status && c.status !== "PENDENTE") continue; // já pago/recebido
-        const temDia = it.dueDay != null && it.dueDay !== "";
+        const v = Store.projectedValue(it, ymStr);
+        if (v == null || v === 0) continue; // fora do período ou já Pago/Recebido (conta 0)
+        if (v > 0) entra += v; else sai += -v;
+        const temDia = !it.autoCartao && it.dueDay != null && it.dueDay !== "";
         lista.push({
-          dia: temDia ? U.diaVencimento(it.dueDay, anoReal, mm) : 99, // sem dia → vai pro fim
+          dia: temDia ? U.diaVencimento(it.dueDay, anoReal, mm) : 99, // sem dia / fatura → vão pro fim
           semDia: !temDia,
-          nome: it.name,
+          fatura: !!it.autoCartao,
+          nome: it.autoCartao ? "Fatura do cartão" : it.name,
           valor: Math.abs(v),
           tipo: v > 0 ? "Receber" : "Pagar",
           cls: v > 0 ? "pos" : "neg"
@@ -63,15 +66,18 @@ const ViewDashboard = (() => {
       for (const l of st.loans) {
         for (const p of l.items) {
           if (p.status === "ABERTO" && p.due && p.due.slice(0, 7) === ymStr) {
+            entra += (p.value || 0);
             lista.push({ dia: Number(p.due.slice(8)), nome: `${l.person} — ${p.label || "parcela"}`, valor: p.value, tipo: "Receber", cls: "pos" });
           }
         }
       }
       if (!lista.length) continue;
       lista.sort((a, b) => a.dia - b.dia);
-      if (mm === mesReal) for (const v of lista) v.atrasado = v.dia < hoje;
-      const total = lista.reduce((s, v) => s + (v.tipo === "Receber" ? v.valor : -v.valor), 0);
-      gruposVenc.push({ ymStr, mm, itens: lista, total });
+      if (mm === mesReal) for (const v of lista) v.atrasado = !v.semDia && v.dia < hoje;
+      entra = Math.round(entra * 100) / 100;
+      sai = Math.round(sai * 100) / 100;
+      const fim = cascataVenc[ymStr] ? cascataVenc[ymStr].end : null;
+      gruposVenc.push({ ymStr, mm, itens: lista, entra, sai, fim });
     }
 
     // Cartões de crédito — faturas de meses anteriores ainda
@@ -206,7 +212,7 @@ const ViewDashboard = (() => {
         </div>
       </div>
       <div class="card mt">
-        <h2 class="section">Próximos vencimentos</h2>
+        <h2 class="section">Próximos meses <span class="muted" style="font-weight:400;font-size:12px">· projeção do saldo</span></h2>
         <div id="dash-venc"></div>
       </div>
 
@@ -310,35 +316,44 @@ const ViewDashboard = (() => {
       compEl.appendChild(leg);
     }
 
-    // Próximos vencimentos agrupados por mês, com total e expansão ao clicar no mês
+    // Próximos meses (mini-tabela): Mês · Entra · Sai · Saldo fim (cascata). Toca no mês → lançamentos.
     const vencEl = root.querySelector("#dash-venc");
-    if (!gruposVenc.length) vencEl.innerHTML = `<p class="empty">Nada pendente daqui até dezembro 🎉</p>`;
-    else for (const g of gruposVenc) {
-      const aberto = g.mm === mes; // mês atual já vem expandido
-      const grupo = U.el(`<div class="venc-group ${aberto ? "open" : ""}"></div>`);
-      const head = U.el(`
-        <button type="button" class="venc-head" aria-expanded="${aberto}">
-          <span class="chev">▸</span>
-          <span class="grow">${U.MESES[g.mm - 1]} <span class="muted" style="font-weight:400">· ${g.itens.length}</span></span>
-          <span class="num ${U.clsValor(g.total)}">${U.brl(g.total)}</span>
-        </button>`);
-      const itens = U.el(`<div class="venc-itens"></div>`);
-      for (const v of g.itens) {
-        const data = v.semDia ? "s/ dia" : String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
-        itens.appendChild(U.el(`
-          <div class="list-row">
-            <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
-            <span class="grow">${U.esc(v.nome)}<span class="muted" style="font-size:11px"> · ${v.tipo}</span></span>
-            <span class="num ${v.cls}">${U.brl(v.valor)}</span>
-          </div>`));
+    if (!gruposVenc.length) {
+      vencEl.innerHTML = `<p class="empty">Nada pendente daqui até dezembro 🎉</p>`;
+    } else {
+      const nf = v => Math.round(Math.abs(v)).toLocaleString("pt-BR"); // R$, sem centavos
+      const tbl = U.el(`
+        <table class="tbl tbl-proj">
+          <thead><tr><th>Mês</th><th class="num">Entra</th><th class="num">Sai</th><th class="num">Saldo fim</th></tr></thead>
+          <tbody></tbody>
+        </table>`);
+      const tb = tbl.querySelector("tbody");
+      for (const g of gruposVenc) {
+        const fimCls = g.fim != null ? U.clsValor(g.fim) : "muted";
+        const row = U.el(`
+          <tr class="proj-row ${g.mm === mes ? "open" : ""}">
+            <td><span class="chev">▸</span> <b>${U.MESES_ABREV[g.mm - 1]}</b> <span class="muted" style="font-size:11px">· ${g.itens.length}</span></td>
+            <td class="num pos">${nf(g.entra)}</td>
+            <td class="num neg">${nf(g.sai)}</td>
+            <td class="num ${fimCls}" style="font-weight:700">${g.fim != null ? nf(g.fim) : "—"}</td>
+          </tr>`);
+        const det = U.el(`<tr class="proj-det" ${g.mm === mes ? "" : "hidden"}><td colspan="4"></td></tr>`);
+        const box = det.querySelector("td");
+        for (const v of g.itens) {
+          const data = v.fatura ? "fatura" : v.semDia ? "s/ dia" : String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
+          box.appendChild(U.el(`
+            <div class="list-row">
+              <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
+              <span class="grow">${U.esc(v.nome)}<span class="muted" style="font-size:11px"> · ${v.tipo}</span></span>
+              <span class="num ${v.cls}">${U.brl(v.valor)}</span>
+            </div>`));
+        }
+        row.addEventListener("click", () => { const o = row.classList.toggle("open"); det.hidden = !o; });
+        tb.appendChild(row);
+        tb.appendChild(det);
       }
-      head.addEventListener("click", () => {
-        const open = grupo.classList.toggle("open");
-        head.setAttribute("aria-expanded", open);
-      });
-      grupo.appendChild(head);
-      grupo.appendChild(itens);
-      vencEl.appendChild(grupo);
+      vencEl.appendChild(tbl);
+      vencEl.appendChild(U.el(`<div class="muted" style="font-size:11.5px;margin-top:8px">Valores em R$ (sem centavos). Entra = receitas + empréstimo · Sai = despesas + fatura do cartão · Saldo fim = saldo início + entra − sai (encadeia mês a mês). Toque no mês pra ver os lançamentos.</div>`));
     }
   }
 
