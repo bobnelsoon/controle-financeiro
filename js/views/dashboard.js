@@ -135,14 +135,18 @@ const ViewDashboard = (() => {
         <span class="muted" id="dash-sync-info" style="font-size:11.5px">${typeof Sync !== "undefined" ? U.esc(Sync.statusTexto()) : ""}</span>
         <button class="btn-primary" id="btn-atualizar">🔄 Atualizar</button>
       </div>
-      <div class="cards-grid">
-        <div class="card stat clickable" data-goto="fluxo">
+      <div class="cards-grid cards-2">
+        <div class="card stat stat-duplo clickable" data-goto="fluxo">
           <div class="stat-label">💰 Saldo em conta <button class="btn-sm" id="btn-edit-conta" title="Atualizar saldo">✎</button></div>
           <div class="stat-value num ${saldoConta != null ? U.clsValor(saldoConta) : "muted"}">${saldoConta != null ? U.brl(saldoConta) : "informar"}</div>
           <div class="stat-sub">${saldoConta != null && saldoConta < 0
             ? `<span style="color:var(--critical);font-weight:600">⚠️ Cheque especial em uso: ${U.brl(Math.abs(saldoConta))}</span>`
             : (conta ? "atualizado automaticamente conforme você paga/recebe" : "clique no lápis para informar")}</div>
-          <button class="btn-sm dash-acao" id="btn-compra-cartao">💳 Compra no cartão</button>
+          <div class="stat-linha2">
+            <div class="stat-label">No fim de ${U.MESES[mes - 1]} (previsto)</div>
+            <div class="stat-value num ${fimMes != null ? U.clsValor(fimMes) : "muted"}">${fimMes != null ? U.brl(fimMes) : "informe o saldo"}</div>
+            <div class="stat-sub">saldo em conta + a receber − a pagar</div>
+          </div>
         </div>
         <div class="card stat stat-duplo clickable" data-goto="fluxo">
           <div class="stat-label">A receber em ${U.MESES[mes - 1]}</div>
@@ -153,11 +157,6 @@ const ViewDashboard = (() => {
             <div class="stat-value neg num">${U.brl(-aPagar)}</div>
             <div class="stat-sub">despesa fixa + fatura (o que ainda falta)</div>
           </div>
-        </div>
-        <div class="card stat clickable" data-goto="fluxo">
-          <div class="stat-label">No fim de ${U.MESES[mes - 1]} (previsto)</div>
-          <div class="stat-value num ${fimMes != null ? U.clsValor(fimMes) : "muted"}">${fimMes != null ? U.brl(fimMes) : "informe o saldo"}</div>
-          <div class="stat-sub">saldo em conta + a receber − a pagar</div>
         </div>
       </div>
 
@@ -275,11 +274,6 @@ const ViewDashboard = (() => {
         App.render();
         if (avisos.length) alert("Atualizado com avisos:\n• " + avisos.join("\n• "));
       }
-    });
-
-    root.querySelector("#btn-compra-cartao").addEventListener("click", (e) => {
-      e.stopPropagation();
-      ViewCartoes.abrirNovaCompra(null); // mesma tela da aba Cartões; ao salvar, re-renderiza o dashboard
     });
 
     root.querySelector("#btn-edit-conta").addEventListener("click", (e) => {
