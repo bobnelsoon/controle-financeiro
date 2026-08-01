@@ -94,6 +94,61 @@ const Charts = (() => {
     });
   }
 
+  // ---------- Gráfico de 2 linhas: receita x despesa mês a mês ----------
+  // serie: [{ym, receita, despesa}] (valores positivos)
+  function receitaDespesaChart(container, serie) {
+    container.innerHTML = "";
+    if (!serie.length) { container.textContent = "Sem dados."; return; }
+    const W = 720, H = 260, padL = 64, padR = 16, padT = 16, padB = 30;
+    const max = Math.max(1, ...serie.map(p => Math.max(p.receita || 0, p.despesa || 0))) * 1.08;
+    const x = i => padL + (i / (serie.length - 1 || 1)) * (W - padL - padR);
+    const y = v => padT + (1 - v / max) * (H - padT - padB);
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img" });
+
+    for (let i = 0; i <= 4; i++) {
+      const v = (i / 4) * max, yy = y(v);
+      svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: yy, y2: yy, class: "gridline" }));
+      const t = svgEl("text", { x: padL - 8, y: yy + 4, class: "tick", "text-anchor": "end" });
+      t.textContent = U.brlCurto(v);
+      svg.appendChild(t);
+    }
+    serie.forEach((p, i) => {
+      const t = svgEl("text", { x: x(i), y: H - 8, class: "tick", "text-anchor": "middle" });
+      t.textContent = U.MESES_ABREV[U.ymParse(p.ym).m - 1];
+      svg.appendChild(t);
+    });
+
+    const linha = (key, color) => {
+      let d = "";
+      serie.forEach((p, i) => { d += (i === 0 ? "M" : "L") + " " + x(i) + " " + y(p[key] || 0) + " "; });
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2.5, "stroke-linejoin": "round" }));
+      serie.forEach((p, i) => svg.appendChild(svgEl("circle", { cx: x(i), cy: y(p[key] || 0), r: 2.6, fill: color })));
+    };
+    linha("receita", "#22c55e");
+    linha("despesa", "#ef4444");
+
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: padT, y2: H - padB, class: "crosshair", style: "display:none" });
+    svg.appendChild(cross);
+    const tip = U.el(`<div class="tooltip" style="display:none"></div>`);
+    container.style.position = "relative";
+    container.appendChild(svg);
+    container.appendChild(tip);
+    svg.addEventListener("mousemove", ev => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) * (W / r.width);
+      let idx = Math.round(((px - padL) / (W - padL - padR)) * (serie.length - 1));
+      idx = Math.max(0, Math.min(serie.length - 1, idx));
+      const p = serie[idx];
+      cross.setAttribute("x1", x(idx)); cross.setAttribute("x2", x(idx)); cross.style.display = "";
+      tip.style.display = "";
+      tip.innerHTML = `<strong>${U.ymLabel(p.ym)}</strong><br><b class="pos">Receita ${U.brl(p.receita || 0)}</b><br><b class="neg">Despesa ${U.brl(p.despesa || 0)}</b>`;
+      const cx = (x(idx) / W) * r.width;
+      tip.style.left = Math.min(r.width - 160, Math.max(4, cx + 10)) + "px";
+      tip.style.top = "6px";
+    });
+    svg.addEventListener("mouseleave", () => { cross.style.display = "none"; tip.style.display = "none"; });
+  }
+
   // ---------- Barras horizontais: gastos por categoria ----------
   // rows: [{label, value}] (valores positivos)
   function barsH(container, rows) {
@@ -122,5 +177,5 @@ const Charts = (() => {
       <span class="budget-track"><span class="budget-fill ${nivel}" style="width:${Math.min(100, pct)}%"></span></span>`);
   }
 
-  return { saldoChart, barsH, budgetBar };
+  return { saldoChart, receitaDespesaChart, barsH, budgetBar };
 })();

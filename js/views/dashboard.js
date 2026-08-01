@@ -10,9 +10,12 @@ const ViewDashboard = (() => {
     const ymAtual = ymRef;
     const { y: ano, m: mes } = U.ymParse(ymAtual);
 
-    const serie = Store.saldoProjecaoSerie(); // alimenta o gráfico de projeção
     const conta = st.settings.conta;
     const saldoConta = Store.saldoContaAtual();
+    // Gráfico receita x despesa mês a mês (do ano do mês de trabalho) + total do ano.
+    const rdSerie = Store.receitaDespesaSerie(ano);
+    const rdTotReceita = Math.round(rdSerie.reduce((s, p) => s + p.receita, 0) * 100) / 100;
+    const rdTotDespesa = Math.round(rdSerie.reduce((s, p) => s + p.despesa, 0) * 100) / 100;
 
     // Quadro "A receber / A pagar" do mês de trabalho — só o que AINDA falta (do fluxo):
     //  - A receber = receita fixa pendente + empréstimos ABERTOS a receber no mês.
@@ -178,15 +181,23 @@ const ViewDashboard = (() => {
         </div>
       </div>` : ""}
 
-      <div class="grid-2 mt">
-        <div class="card">
-          <h2 class="section">Projeção do saldo — ${U.MESES[mes - 1]} a Dez/${ano}</h2>
-          <div id="chart-saldo"></div>
+      <div class="card mt">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <h2 class="section" style="margin:0">Receita × Despesa — ${ano}</h2>
+          <div class="muted" style="font-size:12px;display:flex;gap:14px">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Receita</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Despesa</span>
+          </div>
         </div>
-        <div class="card">
-          <h2 class="section">Próximos vencimentos</h2>
-          <div id="dash-venc"></div>
+        <div id="chart-rd" class="mt"></div>
+        <div class="cartoes-total" style="border-top:1px solid var(--border, #333);margin-top:8px;padding-top:8px">
+          <span>Total do ano</span>
+          <b class="num"><span class="pos">${U.brl(rdTotReceita)}</span> <span class="muted">receita</span> · <span class="neg">${U.brl(rdTotDespesa)}</span> <span class="muted">despesa</span></b>
         </div>
+      </div>
+      <div class="card mt">
+        <h2 class="section">Próximos vencimentos</h2>
+        <div id="dash-venc"></div>
       </div>
 
       <div class="grid-2 mt">
@@ -283,7 +294,7 @@ const ViewDashboard = (() => {
       });
     });
 
-    Charts.saldoChart(root.querySelector("#chart-saldo"), serie);
+    Charts.receitaDespesaChart(root.querySelector("#chart-rd"), rdSerie);
 
     // Composição da carteira: barra = fatia do total; mostra R$ e %
     const compEl = root.querySelector("#comp-carteira");

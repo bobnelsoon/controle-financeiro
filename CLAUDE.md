@@ -162,7 +162,10 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 - **Projeção do saldo** (`Store.saldoProjecaoSerie`): começa no `saldoContaAtual` e projeta do mês atual
   até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0) **+
-  `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). Alimenta o **gráfico** do dashboard.
+  `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). ⚠️ O gráfico do Dashboard **NÃO** é mais a
+  projeção de saldo: virou **"Receita × Despesa — <ano>"** (2 linhas mês a mês, `Charts.receitaDespesaChart`
+  + `Store.receitaDespesaSerie(ano)` com valores CHEIOS via `plannedValue` + fatura cheia; rodapé mostra o
+  **total do ano** de receita e despesa). `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
   ⚠️ A linha do **Fluxo Anual chama-se "Saldo na conta (fim do mês)" e NÃO acumula** (decisão do usuário —
   a soma empilhada dava um número irreal lá na frente): cada mês = `saldoContaAtual + monthTotal(mês) +
   loansAReceberMes(mês)` (saldo de hoje + o resultado só daquele mês), calculado direto no `fluxo.js`
