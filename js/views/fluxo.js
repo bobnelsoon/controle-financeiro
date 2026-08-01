@@ -109,6 +109,35 @@ const ViewFluxo = (() => {
     });
   }
 
+  // Lê os campos do form de item para um objeto (usado no Salvar e no "Aplicar aos próximos meses").
+  function lerItemForm(form) {
+    return { nome: form.nome.value.trim(), cat: form.cat.value, valorRaw: form.valor.value,
+      dia: lerDia(form), inicio: form.inicio.value, fim: form.fim.value };
+  }
+  // Aplica os campos lidos ao item. Retorna false se faltar o nome.
+  function aplicarItemForm(item, vals) {
+    if (!vals.nome) return false;
+    item.name = vals.nome;
+    item.categoryId = vals.cat;
+    const v = U.parseMoney(vals.valorRaw);
+    item.defaultValue = v == null ? null : (item.kind === "despesa" ? -Math.abs(v) : Math.abs(v));
+    item.dueDay = vals.dia;
+    item.startMonth = vals.inicio || item.startMonth;
+    item.endMonth = vals.fim || null;
+    return true;
+  }
+  // Células deste item com valor digitado à mão a partir de `desde` que ainda NÃO foram
+  // marcadas como Pago/Recebido (essas ficam intactas — já mexeram no saldo).
+  function cellsComValorManual(item, desde) {
+    return Object.keys(Store.state.flowCells).filter(k => {
+      if (!k.startsWith(item.id + "|")) return false;
+      const ym = k.split("|")[1];
+      if (U.ymCmp(ym, desde) < 0) return false;
+      const c = Store.state.flowCells[k];
+      return c && c.value != null && c.status !== "PAGO" && c.status !== "RECEBIDO";
+    });
+  }
+
   function abrirEditarItem(item) {
     UI.modal("Editar item: " + item.name, `
       <label class="fld"><span>Nome</span><input type="text" name="nome" required value="${U.esc(item.name)}"></label>
@@ -119,18 +148,34 @@ const ViewFluxo = (() => {
       ${selectDia(item.dueDay, item.kind)}
       <label class="fld"><span>Começa em</span><input type="month" name="inicio" value="${item.startMonth || ""}"></label>
       <label class="fld"><span>Termina em (opcional)</span><input type="month" name="fim" value="${item.endMonth || ""}"></label>
+      <p class="muted" style="font-size:12px">Mudou o valor? <b>Salvar</b> troca só o padrão (meses com valor digitado à mão continuam como estão).
+      <b>Aplicar aos próximos meses</b> troca o padrão e limpa os valores à mão a partir do mês de trabalho, deixando o novo padrão valer (não mexe em meses já marcados como Pago/Recebido).</p>
     `, (form) => {
-      const nome = form.nome.value.trim();
-      if (!nome) return false;
-      item.name = nome;
-      item.categoryId = form.cat.value;
-      let v = U.parseMoney(form.valor.value);
-      item.defaultValue = v == null ? null : (item.kind === "despesa" ? -Math.abs(v) : Math.abs(v));
-      item.dueDay = lerDia(form);
-      item.startMonth = form.inicio.value || item.startMonth;
-      item.endMonth = form.fim.value || null;
+      if (!aplicarItemForm(item, lerItemForm(form))) return false;
       Store.save();
       App.render();
+    }, { extraBtn: `<button type="button" class="aplicar-prox">Aplicar aos próximos meses</button>` });
+
+    const btnAplicar = document.querySelector(".aplicar-prox");
+    if (btnAplicar) btnAplicar.addEventListener("click", () => {
+      const form = document.querySelector(".overlay form");
+      const vals = lerItemForm(form);
+      const vParsed = U.parseMoney(vals.valorRaw);
+      if (!vals.nome) return;
+      if (vParsed == null) { alert("Informe um valor padrão para aplicar aos próximos meses."); return; }
+      const desde = App.mesRef();
+      const valorDef = item.kind === "despesa" ? -Math.abs(vParsed) : Math.abs(vParsed);
+      const alvos = cellsComValorManual(item, desde);
+      UI.closeModal();
+      UI.confirmar(
+        `Aplicar ${U.brl(valorDef)} como padrão de "${vals.nome}" a partir de ${U.ymLabel(desde)}?` +
+        (alvos.length ? ` Isso limpa ${alvos.length} mês(es) com valor digitado à mão (não mexe nos marcados como Pago/Recebido).` : ""),
+        () => {
+          aplicarItemForm(item, vals);
+          for (const k of alvos) Store.setCell(item.id, k.split("|")[1], null);
+          Store.save();
+          App.render();
+        });
     });
   }
 
