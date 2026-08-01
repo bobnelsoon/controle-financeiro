@@ -391,6 +391,28 @@ const Store = (() => {
     return Math.round(t * 100) / 100;
   }
 
+  // Cascata do Fluxo Anual: para cada mês (do mês ATUAL até dez do ano pedido), devolve o saldo
+  // INICIAL (= saldo na conta no começo do mês) e o FINAL (= inicial + resultado do mês). O saldo
+  // inicial do mês atual é o `saldoContaAtual` (o mesmo do Dashboard); o inicial de cada mês seguinte
+  // é o FINAL do mês anterior — o dinheiro "passa" de um mês pro outro (projeção). Meses passados e
+  // sem saldo informado ficam de fora (undefined). Devolve um mapa { ym: {ini, end} }.
+  function fluxoCascataSerie(ano) {
+    const map = {};
+    const base = saldoContaAtual();
+    if (base == null) return map;
+    const startYm = U.ymHoje();
+    const fimYm = U.ym(ano, 12);
+    if (U.ymCmp(fimYm, startYm) < 0) return map; // ano inteiro no passado
+    let ini = base, cur = startYm, g = 0;
+    while (U.ymCmp(cur, fimYm) <= 0 && g++ < 48) {
+      const end = Math.round((ini + monthTotal(cur) + loansAReceberMes(cur)) * 100) / 100;
+      map[cur] = { ini: Math.round(ini * 100) / 100, end };
+      ini = end;
+      cur = U.ymAdd(cur, 1);
+    }
+    return map;
+  }
+
   // Saldo acumulado.
   // Se o usuário informou o saldo em conta (settings.conta = {ym, valor}), a projeção
   // parte desse valor real: saldo(mês âncora) = valor informado + pendências do próprio mês.
@@ -941,7 +963,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,

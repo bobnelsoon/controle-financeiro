@@ -198,35 +198,33 @@ const ViewFluxo = (() => {
     const receitas = st.flowItems.filter(i => i.kind === "receita");
     const despesas = st.flowItems.filter(i => i.kind === "despesa");
 
+    // Cascata: saldo na conta que passa de um mês pro outro. cascata[ym] = { ini, end }.
+    const cascata = Store.fluxoCascataSerie(ano);
+    const fmtCel = v => v == null ? "" : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
+    // Linha "Saldo na conta" NO TOPO (acima do Salário): saldo no COMEÇO do mês. No mês atual é o
+    // saldo do Dashboard; nos próximos, é o valor final do mês anterior (só valor, sem Pago/Recebido).
+    const trSaldoIni = U.el(`<tr class="total"><td>Saldo na conta</td></tr>`);
+    for (const mm of meses) {
+      const v = cascata[mm] ? cascata[mm].ini : null;
+      trSaldoIni.appendChild(U.el(`<td class="num ${v == null ? "" : U.clsValor(v)}" style="text-align:right">${fmtCel(v)}</td>`));
+    }
+    body.appendChild(trSaldoIni);
+
     body.appendChild(U.el(`<tr class="grupo"><td>RECEITAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of receitas) body.appendChild(linhaItem(it, meses, ymAtual));
 
     body.appendChild(U.el(`<tr class="grupo"><td>DESPESAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of despesas) body.appendChild(linhaItem(it, meses, ymAtual));
 
-    // Totais — o que ainda falta no mês (monthTotal/projectedValue: já Pago/Recebido = 0),
-    // mesma base do Dashboard. Mês todo quitado → 0.
+    // "Resultado do mês" = saldo na conta (início) + receitas − despesas = SALDO NO FIM DO MÊS.
+    // Vira o "Saldo na conta" do mês seguinte (cascata). Igual ao "No fim de <mês>" do Dashboard.
     const trTotal = U.el(`<tr class="total"><td>Resultado do mês</td></tr>`);
     for (const mm of meses) {
-      const t = Store.monthTotal(mm);
-      trTotal.appendChild(U.el(`<td class="num ${U.clsValor(t)}" style="text-align:right">${t.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>`));
+      const v = cascata[mm] ? cascata[mm].end : null;
+      trTotal.appendChild(U.el(`<td class="num ${v == null ? "" : U.clsValor(v)}" style="text-align:right">${fmtCel(v)}</td>`));
     }
     body.appendChild(trTotal);
-
-    // Saldo na conta no FIM DO MÊS — NÃO acumula mês a mês. Cada mês = saldo real da conta HOJE +
-    // o resultado daquele mês (a receber − a pagar do mês + empréstimos). Assim é o "quanto vou ter
-    // no fim do mês" (igual ao Dashboard), sem ir empilhando um número irreal ao longo do ano.
-    // Meses já passados (antes do mês atual) e sem saldo informado ficam em branco.
-    const saldoConta = Store.saldoContaAtual();
-    const ymHojeStr = U.ymHoje();
-    const trSaldo = U.el(`<tr class="total"><td>Saldo na conta (fim do mês)</td></tr>`);
-    for (const mm of meses) {
-      const mostra = saldoConta != null && U.ymCmp(mm, ymHojeStr) >= 0;
-      const val = mostra ? Math.round((saldoConta + Store.monthTotal(mm) + Store.loansAReceberMes(mm)) * 100) / 100 : null;
-      const txt = val == null ? "" : val.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-      trSaldo.appendChild(U.el(`<td class="num ${val == null ? "" : U.clsValor(val)}" style="text-align:right">${txt}</td>`));
-    }
-    body.appendChild(trSaldo);
   }
 
   return { render };

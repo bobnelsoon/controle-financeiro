@@ -168,11 +168,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   `settings.fluxoDesde`** (init idempotente no `migrate` = `U.ymHoje()` na 1ª vez; p/ o usuário = `2026-08`)
   ficam **ZERADOS** no gráfico — antes disso o fluxo não estava na automação.
   `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
-  ⚠️ A linha do **Fluxo Anual chama-se "Saldo na conta (fim do mês)" e NÃO acumula** (decisão do usuário —
-  a soma empilhada dava um número irreal lá na frente): cada mês = `saldoContaAtual + monthTotal(mês) +
-  loansAReceberMes(mês)` (saldo de hoje + o resultado só daquele mês), calculado direto no `fluxo.js`
-  (não usa mais `saldoAcumuladoSerie`); meses antes do atual ou sem saldo informado ficam em branco.
-  `Store.saldoAcumuladoSerie`/`saldoSerie` seguem no store (sem uso no fluxo agora).
+  O **Fluxo Anual vira uma CASCATA** (`Store.fluxoCascataSerie(ano)` → `{ ym: {ini, end} }`): linha
+  **"Saldo na conta"** no TOPO (saldo no COMEÇO do mês — no mês atual = `saldoContaAtual`, o mesmo do dash;
+  nos próximos = fim do mês anterior, só valor sem Pago/Recebido) e **"Resultado do mês"** embaixo =
+  `ini + monthTotal(mês) + loansAReceberMes(mês)` = **saldo no FIM do mês** (= "No fim de <mês>" do dash), que
+  vira o "Saldo na conta" do mês seguinte — o dinheiro passa de um mês pro outro (projeção). Meses passados ou
+  sem saldo informado ficam em branco. `Store.saldoAcumuladoSerie`/`saldoSerie` seguem no store (sem uso).
+  Os **Próximos vencimentos** do dash incluem também itens **sem `dueDay`** (aparecem como "s/ dia").
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
