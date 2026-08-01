@@ -213,13 +213,18 @@ const ViewFluxo = (() => {
     }
     body.appendChild(trTotal);
 
-    // Saldo acumulado — projeção ancorada no saldo real da conta (igual ao "Acumulado do
-    // mês" do dashboard no mês atual). Meses já realizados ficam em branco.
-    const serie = Store.saldoAcumuladoSerie(ano);
-    const trSaldo = U.el(`<tr class="total"><td>Saldo acumulado</td></tr>`);
-    for (const p of serie) {
-      const txt = p.saldo == null ? "" : p.saldo.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-      trSaldo.appendChild(U.el(`<td class="num ${p.saldo == null ? "" : U.clsValor(p.saldo)}" style="text-align:right">${txt}</td>`));
+    // Saldo na conta no FIM DO MÊS — NÃO acumula mês a mês. Cada mês = saldo real da conta HOJE +
+    // o resultado daquele mês (a receber − a pagar do mês + empréstimos). Assim é o "quanto vou ter
+    // no fim do mês" (igual ao Dashboard), sem ir empilhando um número irreal ao longo do ano.
+    // Meses já passados (antes do mês atual) e sem saldo informado ficam em branco.
+    const saldoConta = Store.saldoContaAtual();
+    const ymHojeStr = U.ymHoje();
+    const trSaldo = U.el(`<tr class="total"><td>Saldo na conta (fim do mês)</td></tr>`);
+    for (const mm of meses) {
+      const mostra = saldoConta != null && U.ymCmp(mm, ymHojeStr) >= 0;
+      const val = mostra ? Math.round((saldoConta + Store.monthTotal(mm) + Store.loansAReceberMes(mm)) * 100) / 100 : null;
+      const txt = val == null ? "" : val.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+      trSaldo.appendChild(U.el(`<td class="num ${val == null ? "" : U.clsValor(val)}" style="text-align:right">${txt}</td>`));
     }
     body.appendChild(trSaldo);
   }
