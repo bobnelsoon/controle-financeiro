@@ -175,6 +175,9 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
   verde/vermelho) usam `avgPrice` vs cotação atual; ficam "—" enquanto o preço pago não é informado.
+  A aba tem um **gráfico de linha "📈 Rentabilidade da carteira (%)"** (`Store.rentabilidadeSerie` +
+  `Charts.saldoChart` com `opts.fmt`/`fmtTick` em %): cada snapshot do histórico grava `custo`/`pct`
+  (via `saveQuotes`); snapshots antigos sem custo são estimados com o custo ATUAL (posições estáveis).
   A aba tem **📥 Importar** (`ViewInvestimentos.abrirImportar`): cola JSON — lista de ativos
   `[{ticker, type, qty, avgPrice}]` ou objeto `{assets, fixed}` (renda fixa junto). Atualiza pelo ticker
   (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii). Coluna

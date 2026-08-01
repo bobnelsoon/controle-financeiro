@@ -11,8 +11,10 @@ const Charts = (() => {
   }
 
   // ---------- Gráfico de linha/área: evolução do saldo ----------
-  // series: [{ym, saldo}]
-  function saldoChart(container, serie) {
+  // series: [{ym, saldo}]; opts.fmt (tooltip) e opts.fmtTick (eixo Y) — padrão BRL.
+  function saldoChart(container, serie, opts = {}) {
+    const fmt = opts.fmt || U.brl;
+    const fmtTick = opts.fmtTick || U.brlCurto;
     container.innerHTML = "";
     if (!serie.length) { container.textContent = "Sem dados."; return; }
 
@@ -34,7 +36,7 @@ const Charts = (() => {
       const yy = y(v);
       svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: yy, y2: yy, class: "gridline" }));
       const t = svgEl("text", { x: padL - 8, y: yy + 4, class: "tick", "text-anchor": "end" });
-      t.textContent = U.brlCurto(v);
+      t.textContent = fmtTick(v);
       svg.appendChild(t);
     }
     // linha do zero destacada
@@ -84,7 +86,7 @@ const Charts = (() => {
       dot.setAttribute("cx", x(idx)); dot.setAttribute("cy", y(p.saldo));
       tip.style.display = "";
       const tipLabel = p.ym.length === 10 ? U.dataBR(p.ym) : U.ymLabel(p.ym);
-      tip.innerHTML = `<strong>${tipLabel}</strong><br><b class="${U.clsValor(p.saldo)}">${U.brl(p.saldo)}</b>`;
+      tip.innerHTML = `<strong>${tipLabel}</strong><br><b class="${U.clsValor(p.saldo)}">${fmt(p.saldo)}</b>`;
       const cx = (x(idx) / W) * r.width;
       tip.style.left = Math.min(r.width - 150, Math.max(4, cx + 10)) + "px";
       tip.style.top = ((y(p.saldo) / H) * r.height - 54) + "px";

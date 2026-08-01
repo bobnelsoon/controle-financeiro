@@ -355,6 +355,14 @@ const ViewInvestimentos = (() => {
         <div id="rf-list" class="mt"></div>
       </div>
 
+      <div class="card mb">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <h2 class="section" style="margin:0">📈 Rentabilidade da carteira (%)</h2>
+          ${rent ? `<b class="num ${rent.ganho >= 0 ? "pos" : "neg"}">${rent.ganho >= 0 ? "+" : ""}${rent.pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% <span class="muted" style="font-weight:400">agora</span></b>` : ""}
+        </div>
+        <div id="chart-rent" class="mt"></div>
+      </div>
+
       <div class="card">
         <h2 class="section">Evolução do patrimônio (registrada a cada atualização de cotações)</h2>
         <div id="chart-hist"></div>
@@ -465,6 +473,16 @@ const ViewInvestimentos = (() => {
         });
         rfList.appendChild(row);
       }
+    }
+
+    // Rentabilidade da carteira (%) ao longo do tempo
+    const rentSerie = Store.rentabilidadeSerie();
+    const rentEl = root.querySelector("#chart-rent");
+    if (rentSerie.length >= 2) {
+      const fmtPct = v => (v >= 0 ? "+" : "") + v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
+      Charts.saldoChart(rentEl, rentSerie, { fmt: fmtPct, fmtTick: fmtPct });
+    } else {
+      rentEl.innerHTML = `<p class="empty">A linha de rentabilidade aparece a partir do 2º dia — cada "🔄 Atualizar cotações" grava um ponto (precisa ter o preço médio informado).</p>`;
     }
 
     // Histórico do patrimônio
