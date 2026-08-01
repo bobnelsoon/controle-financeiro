@@ -347,16 +347,18 @@ table.fluxo { border-collapse: collapse; font-size: 12.5px; min-width: 1080px; }
 .hbar-fill { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
 .hbar-value { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Composição da carteira (dashboard): valor + % à direita, mais espaço que a barra de despesas */
-#comp-carteira .hbar-row { grid-template-columns: 78px 1fr max-content; }
-#comp-carteira .hbar-value { white-space: nowrap; }
-#comp-carteira .comp-total { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
-#comp-carteira .comp-total .hbar-track { background: none; }
+/* Composição da carteira (dashboard): barra ÚNICA segmentada + legenda */
+.comp-bar { display: flex; height: 16px; border-radius: 6px; overflow: hidden; margin: 2px 0 10px; }
+.comp-bar > span { display: block; min-width: 2px; }
+.comp-leg { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; }
+.comp-leg-item { white-space: nowrap; }
+.comp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 
-/* Resumo da carteira (dashboard): linhas rótulo → valor */
-.inv-resumo { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-.inv-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
-.inv-linha + .inv-linha { padding-top: 8px; border-top: 1px solid var(--border); }
+/* KPIs da carteira (dashboard): Rentabilidade · Aportes · Ativos, em 3 colunas na base */
+.inv-kpis { display: flex; gap: 8px; text-align: center; border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
+.inv-kpis > div { flex: 1; }
+.inv-kpis .k-lbl { color: var(--muted); font-size: 11px; }
+.inv-kpis .k-val { font-size: 13px; font-weight: 700; white-space: nowrap; }
 
 .budget-track { display: block; background: color-mix(in srgb, var(--grid) 55%, transparent); border-radius: 4px; height: 12px; overflow: hidden; }
 .budget-fill { display: block; height: 100%; border-radius: 0 4px 4px 0; }
