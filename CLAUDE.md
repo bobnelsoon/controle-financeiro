@@ -136,11 +136,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   **0**, então mês todo quitado → Resultado 0). ⚠️ **`projectedValue` checa o STATUS ANTES do valor**:
   célula marcada Pago/Recebido conta **0 mesmo que tenha valor digitado no mês** (o valor já foi para o
   saldo via `settledValue`). Era um bug (checava o valor primeiro): item com valor próprio marcado continuava
-  somando no Resultado e "inflava" o Dashboard. **Dashboard** (topo): três quadros — **Saldo em conta**,
-  **A receber / A pagar** do mês de trabalho (Σ `projectedValue` pendente: >0 a receber + `loansAReceberMes`;
-  <0 a pagar, inclui a fatura via item `autoCartao`) e **No fim de <mês> (previsto)** = `saldoContaAtual + a
-  receber − a pagar`. Marcar Pago/Recebido tira do "a receber/a pagar" e mexe no saldo → o "No fim" fica
-  estável. Os antigos cards Receitas/Despesas/Resultado/Acumulado/Saldo-projetado do topo foram **removidos**
+  somando no Resultado e "inflava" o Dashboard. **Dashboard** (topo): **DOIS quadros** lado a lado, iguais
+  (`.cards-grid.cards-2` = grid `1fr 1fr`, empilha só < 360px): (1) **Saldo em conta** + **No fim de <mês>
+  (previsto)** = `saldoContaAtual + a receber − a pagar` (2ª linha `.stat-linha2`, ancorada na base via
+  `margin-top:auto`); (2) **A receber / A pagar** do mês de trabalho (Σ `projectedValue` pendente: >0 a
+  receber + `loansAReceberMes`; <0 a pagar, inclui a fatura via item `autoCartao`). Marcar Pago/Recebido tira
+  do "a receber/a pagar" e mexe no saldo → o "No fim" fica estável. O botão **"Compra no cartão"** saiu do
+  card de saldo (o "No fim" tomou o lugar) — continua acessível pelo **FAB ➕** e pelo menu **Adicionar**. Os antigos cards Receitas/Despesas/Resultado/Acumulado/Saldo-projetado do topo foram **removidos**
   (`plannedValue` segue no store, sem uso no dashboard). ⚠️ A função antiga `Store.resultadoMes` foi
   **removida**; não recriar.
 
@@ -248,6 +250,11 @@ No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Cart
     por `entry.linkCardTxId` (+ `payment: "cartao"`, `cardId`). **Editar** o abastecimento remove o `cardTx`
     antigo e recria; **excluir** remove o `cardTx`. A **importação NÃO cria** lançamentos (é histórico) e o
     **pedágio fica de fora** da integração. Só cartão por enquanto (pix/dinheiro não foram pedidos).
+    - **Conveniência no mesmo pagamento**: quando paga no cartão, o form tem um campo opcional
+      **＋ Conveniência** (valor + "o que comprou?"). Cria uma **compra à parte na MESMA fatura** (desc do
+      usuário ou "Conveniência"), vinculada por `entry.linkConvTxId`. **NÃO entra no total do abastecimento**
+      → consumo (km/l), preço do litro e custo/km continuam certos. Editar recria (sem duplicar) e excluir
+      remove os dois `cardTx` (combustível + conveniência). Só aparece na caixa do cartão (é "mesmo pagamento").
 
 ## Convenções de UI
 
@@ -289,11 +296,19 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607195000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607195500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#49 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#56 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607195500`, PRs #53–#56):**
+- **Fluxo**: linha somente-leitura **"💠 Empréstimo · a receber"** nas RECEITAS (`loansAReceberMes`,
+  display-only, sem dupla contagem); vencimentos sem dia cobrem **receitas E despesas** ("s/ dia").
+- **Dashboard**: topo enxuto em **2 quadros iguais** — Saldo em conta **+ No fim de <mês>** | A receber **+ A
+  pagar** (`.cards-2`). O botão "Compra no cartão" saiu (FAB ➕ / Adicionar).
+- **Combustível**: **conveniência no mesmo pagamento** do abastecimento (campo ＋ Conveniência na caixa do
+  cartão → 2ª compra na mesma fatura, `entry.linkConvTxId`, fora do consumo). Validado pelo usuário.
 
 **Gráficos do Dashboard e Investimentos** (PUBLICADO, cache `202607195000`, PRs #47–#49):
 - Dashboard: gráfico **"Receita × Despesa — <ano>"** (2 linhas, `Charts.receitaDespesaChart` +
