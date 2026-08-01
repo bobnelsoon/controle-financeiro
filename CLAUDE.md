@@ -166,7 +166,12 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). ⚠️ O gráfico do Dashboard **NÃO** é mais a
   projeção de saldo: virou **"Receita × Despesa — <ano>"** (2 linhas mês a mês, `Charts.receitaDespesaChart`
   + `Store.receitaDespesaSerie(ano)` com valores CHEIOS via `plannedValue` + fatura cheia; rodapé em **3
-  colunas** — Receita · Despesa · **Diferença** — valores sem centavos, sem quebra de linha). Meses **antes de
+  colunas** — Receita · Despesa · **Resultado do ano** (`rdDif` = receita − despesa; era "Diferença") —
+  valores sem centavos, sem quebra de linha). Abaixo do rodapé, uma linha **"📆 No fim de <ano> você terá
+  R$ X"** onde X = `fluxoCascataSerie(ano)[dez].end` = o **mesmo** "Saldo fim" de dezembro da tabela "Próximos
+  meses" (amarra o gráfico ao fluxo). ⚠️ **Resultado do ano ≠ saldo no fim do ano**: a ponte é
+  `saldo fim = saldo de hoje + resultado do ano + empréstimos` (o resultado começa do zero; o saldo tem
+  também o que você já tinha + os empréstimos, que não são receita/despesa). Meses **antes de
   `settings.fluxoDesde`** (init idempotente no `migrate` = `U.ymHoje()` na 1ª vez; p/ o usuário = `2026-08`)
   ficam **ZERADOS** no gráfico — antes disso o fluxo não estava na automação.
   `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
@@ -181,8 +186,14 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   Empréstimos. É **display-only**: a cascata já conta o empréstimo via `loansAReceberMes`, então **não conta
   em dobro** (não é um flowItem). Bate com o **"A receber" do Dashboard** (Σ `projectedValue`>0 pendente +
   `loansAReceberMes`), que puxa tudo do fluxo.
-  Os **Próximos vencimentos** do dash incluem também itens **sem `dueDay`** — **receitas E despesas** (aparecem
-  como "s/ dia"; receita → Receber, despesa → Pagar).
+  O quadro **"Próximos meses"** (ex-"Próximos vencimentos") do dash é uma **mini-tabela de projeção em
+  cascata** (`.tbl-proj`, cabe sem rolagem): do mês REAL de hoje até dezembro, colunas **Mês · Entra · Sai ·
+  Saldo fim** (R$ sem centavos). **Entra** = receitas pendentes + empréstimo (`loansAReceberMes`); **Sai** =
+  despesas pendentes + **FATURA do cartão** (item `autoCartao`, via `projectedValue` — a fatura passou a
+  contar aqui, antes era pulada); **Saldo fim** = `fluxoCascataSerie` end = saldo início + Entra − Sai (=
+  "No fim de <mês>", encadeia). Toca no mês → abre os lançamentos (linha "Fatura do cartão" + itens **sem
+  `dueDay`**: receita → Receber, despesa → Pagar, "s/ dia"; empréstimo "João — parcela"). O mês de trabalho
+  abre expandido.
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
@@ -208,11 +219,14 @@ pagou no período, o **último pagamento disponível** (`ultimoPay`/`ultimoValor
 que pagaram (verde) e mostra os demais esmaecidos com "último: <data>" ou "sem dados". O brapi é consultado
 **escalonado (3 por vez) com 1 nova tentativa** (`mapLimit` em `quotes.js`), para não estourar o limite do
 plano grátis (429) e trazer dado atual para todos.
-No Dashboard, a seção de investimentos (rodapé, `grid-2`) tem o quadro **Carteira de investimentos**
-  (patrimônio, rentabilidade, aportes do ano, nº de ativos) e **Composição da carteira** (Ações / FIIs /
-  Renda fixa em R$ e %, barras proporcionais ao total). O antigo gráfico "Despesas por categoria" e o KPI
-  "Patrimônio investido" do topo foram removidos (`Store.despesasPorCategoria`/`catName` seguem no store,
-  sem uso no dashboard).
+No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de investimentos`, os antigos dois
+  quadros `grid-2` foram fundidos): patrimônio + rentabilidade (R$ · %) no topo, **Composição** como **uma
+  barra horizontal segmentada** (`.comp-bar` — fatia de cada classe, cores fixas por classe: FIIs
+  `var(--accent)`, Ações `#22c55e`, Renda fixa `#f59e0b`) com legenda (`.comp-leg`/`.comp-dot`) em R$ e %, e
+  os KPIs (Rentabilidade · Aportes · Ativos) em 3 colunas na base (`.inv-kpis`). As barras horizontais
+  separadas (`.hbars` no dash) e o resumo em linhas (`.inv-resumo`/`.inv-linha`, removidos do CSS) saíram. O
+  antigo gráfico "Despesas por categoria" e o KPI "Patrimônio investido" do topo foram removidos
+  (`Store.despesasPorCategoria`/`catName` seguem no store, sem uso no dashboard).
 
 - **Combustível (controle ⛽)**: dados em `state.fuel.entries` (entram na sincronização/backup, migração v6).
   Cada registro: `{ id, date, odometer (km), liters, pricePerLiter, total, fuelType (gasolina|alcool|diesel|gnv),
@@ -296,11 +310,21 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607195500`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607196000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#56 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#62 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607196000`, PRs #58–#62):**
+- **Fluxo**: no editor de item, botão **"Aplicar aos próximos meses"** (salva o novo padrão e limpa os
+  valores à mão do item a partir do mês de trabalho; não mexe em meses passados nem nos Pago/Recebido).
+- **Dashboard — Investimentos**: os 2 quadros viraram **UM card** com **barra segmentada** + KPIs na base.
+- **Dashboard — "Próximos meses"** (ex-"Próximos vencimentos"): mini-tabela em **cascata** (Mês · Entra ·
+  Sai · Saldo fim); passou a **contar a FATURA do cartão** e o saldo, batendo com o "No fim de <mês>".
+- **Dashboard — gráfico**: "Diferença" → **"Resultado do ano"** + linha **"📆 No fim de <ano> você terá
+  R$ X"** (= saldo de dez da cascata). Ponte explicada ao usuário: `saldo fim = saldo hoje + resultado +
+  empréstimos` (por isso o saldo final é MAIOR que o resultado do ano).
 
 **Últimas melhorias (PUBLICADAS, cache `202607195500`, PRs #53–#56):**
 - **Fluxo**: linha somente-leitura **"💠 Empréstimo · a receber"** nas RECEITAS (`loansAReceberMes`,
