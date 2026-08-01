@@ -216,7 +216,7 @@ const ViewDashboard = (() => {
         </div>
         ${fimAno != null ? `
         <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
-          <span class="muted" style="font-size:12px">📆 No fim de ${ano} você terá <span style="font-size:10.5px">(saldo de hoje + resultado + empréstimos)</span></span>
+          <span class="muted" style="font-size:12px">📆 No fim de ${ano} você terá</span>
           <b class="num ${U.clsValor(fimAno)}" style="font-size:15px;white-space:nowrap">${U.brl(fimAno)}</b>
         </div>` : ""}
       </div>
