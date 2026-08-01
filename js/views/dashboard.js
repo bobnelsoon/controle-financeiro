@@ -72,9 +72,11 @@ const ViewDashboard = (() => {
       gruposVenc.push({ ymStr, mm, itens: lista, total });
     }
 
-    // Cartões de crédito — a fatura do MÊS DE TRABALHO (ymRef). Faturas de meses anteriores ainda
+    // Cartões de crédito — faturas de meses anteriores ainda
     // não pagas aparecem como linhas "a pagar" (vencidas) e somam no total "Em aberto".
-    const ymCartoes = ymRef;
+    // O cartão olha a FATURA VIGENTE (mês seguinte, avançando na data de fechamento) — à parte do
+    // mês de trabalho: o dash mostra o fluxo do mês atual, mas a fatura que você paga é a do mês seguinte.
+    const ymCartoes = Store.faturaVigenteYm();
     const mesCartoes = U.ymParse(ymCartoes).m;
     const mesGastoCartoes = U.ymParse(U.ymAdd(ymCartoes, -1)).m;
     const cartoesDoMes = st.accounts.filter(a => a.type === "cartao");
