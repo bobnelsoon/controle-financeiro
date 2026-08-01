@@ -164,8 +164,9 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   até dezembro somando `monthTotal` (usa `projectedValue`: itens Pago/Recebido contam 0) **+
   `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). ⚠️ O gráfico do Dashboard **NÃO** é mais a
   projeção de saldo: virou **"Receita × Despesa — <ano>"** (2 linhas mês a mês, `Charts.receitaDespesaChart`
-  + `Store.receitaDespesaSerie(ano)` com valores CHEIOS via `plannedValue` + fatura cheia; rodapé mostra o
-  **total do ano** de receita e despesa). `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
+  + `Store.receitaDespesaSerie(ano)` com valores CHEIOS via `plannedValue` + fatura cheia; rodapé em **3
+  colunas** — Receita · Despesa · **Diferença** — valores sem centavos, sem quebra de linha).
+  `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
   ⚠️ A linha do **Fluxo Anual chama-se "Saldo na conta (fim do mês)" e NÃO acumula** (decisão do usuário —
   a soma empilhada dava um número irreal lá na frente): cada mês = `saldoContaAtual + monthTotal(mês) +
   loansAReceberMes(mês)` (saldo de hoje + o resultado só daquele mês), calculado direto no `fluxo.js`
@@ -175,9 +176,10 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
   verde/vermelho) usam `avgPrice` vs cotação atual; ficam "—" enquanto o preço pago não é informado.
-  A aba tem um **gráfico de linha "📈 Rentabilidade da carteira (%)"** (`Store.rentabilidadeSerie` +
-  `Charts.saldoChart` com `opts.fmt`/`fmtTick` em %): cada snapshot do histórico grava `custo`/`pct`
-  (via `saveQuotes`); snapshots antigos sem custo são estimados com o custo ATUAL (posições estáveis).
+  A aba tem um **gráfico de linha "📈 Rentabilidade da carteira"** em **% e R$** (`Store.rentabilidadeSerie`
+  devolve `{ym, saldo:pct, ganho}`; `Charts.saldoChart` com `opts.fmt(v,p)`/`fmtTick` — eixo em %, tooltip
+  "%· R$"): cada snapshot grava `custo`/`pct` (via `saveQuotes`); snapshots antigos sem custo são estimados
+  com o custo ATUAL (posições estáveis). Uma linha só da carteira (o usuário dispensou linha por ativo).
   A aba tem **📥 Importar** (`ViewInvestimentos.abrirImportar`): cola JSON — lista de ativos
   `[{ticker, type, qty, avgPrice}]` ou objeto `{assets, fixed}` (renda fixa junto). Atualiza pelo ticker
   (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii). Coluna
