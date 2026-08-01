@@ -174,7 +174,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   `ini + monthTotal(mês) + loansAReceberMes(mês)` = **saldo no FIM do mês** (= "No fim de <mês>" do dash), que
   vira o "Saldo na conta" do mês seguinte — o dinheiro passa de um mês pro outro (projeção). Meses passados ou
   sem saldo informado ficam em branco. `Store.saldoAcumuladoSerie`/`saldoSerie` seguem no store (sem uso).
-  Os **Próximos vencimentos** do dash incluem também itens **sem `dueDay`** (aparecem como "s/ dia").
+  Nas **RECEITAS** do fluxo há também uma linha **somente-leitura "💠 Empréstimo · a receber"** (abaixo das
+  receitas fixas) com o total de parcelas ABERTAS do mês (`Store.loansAReceberMes`) — clica pra ir à aba
+  Empréstimos. É **display-only**: a cascata já conta o empréstimo via `loansAReceberMes`, então **não conta
+  em dobro** (não é um flowItem). Bate com o **"A receber" do Dashboard** (Σ `projectedValue`>0 pendente +
+  `loansAReceberMes`), que puxa tudo do fluxo.
+  Os **Próximos vencimentos** do dash incluem também itens **sem `dueDay`** — **receitas E despesas** (aparecem
+  como "s/ dia"; receita → Receber, despesa → Pagar).
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
