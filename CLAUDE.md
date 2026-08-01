@@ -280,11 +280,19 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607194700`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607195000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#45 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#49 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Gráficos do Dashboard e Investimentos** (PUBLICADO, cache `202607195000`, PRs #47–#49):
+- Dashboard: gráfico **"Receita × Despesa — <ano>"** (2 linhas, `Charts.receitaDespesaChart` +
+  `Store.receitaDespesaSerie`); rodapé em **3 colunas** (Receita · Despesa · **Diferença**), sem centavos,
+  sem quebra (Opção 1 escolhida via mockup — mockups em imagem pro usuário escolher são um bom fluxo).
+- Investimentos: gráfico de linha **"📈 Rentabilidade da carteira"** em **% e R$** (`Store.rentabilidadeSerie`,
+  `saveQuotes` grava `custo`/`pct` no snapshot; `Charts.saldoChart` com `opts.fmt(v,p)`). Uma linha só da
+  carteira (usuário dispensou linha por ativo — viraria bagunça com renda fixa/CDB).
 
 **Mês de trabalho global** (PUBLICADO, cache `202607194200`, PR #39): o usuário trabalha **um mês à frente**.
 O Dashboard inteiro olha um único mês = `App.mesRef()` (padrão `Store.faturaVigenteYm`), com seletor **‹ Mês ›**
