@@ -86,7 +86,7 @@ const Charts = (() => {
       dot.setAttribute("cx", x(idx)); dot.setAttribute("cy", y(p.saldo));
       tip.style.display = "";
       const tipLabel = p.ym.length === 10 ? U.dataBR(p.ym) : U.ymLabel(p.ym);
-      tip.innerHTML = `<strong>${tipLabel}</strong><br><b class="${U.clsValor(p.saldo)}">${fmt(p.saldo)}</b>`;
+      tip.innerHTML = `<strong>${tipLabel}</strong><br><b class="${U.clsValor(p.saldo)}">${fmt(p.saldo, p)}</b>`;
       const cx = (x(idx) / W) * r.width;
       tip.style.left = Math.min(r.width - 150, Math.max(4, cx + 10)) + "px";
       tip.style.top = ((y(p.saldo) / H) * r.height - 54) + "px";

@@ -16,6 +16,8 @@ const ViewDashboard = (() => {
     const rdSerie = Store.receitaDespesaSerie(ano);
     const rdTotReceita = Math.round(rdSerie.reduce((s, p) => s + p.receita, 0) * 100) / 100;
     const rdTotDespesa = Math.round(rdSerie.reduce((s, p) => s + p.despesa, 0) * 100) / 100;
+    const rdDif = Math.round((rdTotReceita - rdTotDespesa) * 100) / 100;
+    const brlCheio = v => "R$ " + Math.round(Math.abs(v)).toLocaleString("pt-BR"); // sem centavos
 
     // Quadro "A receber / A pagar" do mês de trabalho — só o que AINDA falta (do fluxo):
     //  - A receber = receita fixa pendente + empréstimos ABERTOS a receber no mês.
@@ -182,17 +184,18 @@ const ViewDashboard = (() => {
       </div>` : ""}
 
       <div class="card mt">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
-          <h2 class="section" style="margin:0">Receita × Despesa — ${ano}</h2>
-          <div class="muted" style="font-size:12px;display:flex;gap:14px">
-            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Receita</span>
-            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Despesa</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <b style="font-size:15px">Receita × Despesa — ${ano}</b>
+          <div class="muted" style="font-size:12px;display:flex;gap:12px">
+            <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Receita</span>
+            <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Despesa</span>
           </div>
         </div>
-        <div id="chart-rd" class="mt"></div>
-        <div class="cartoes-total" style="border-top:1px solid var(--border, #333);margin-top:8px;padding-top:8px">
-          <span>Total do ano</span>
-          <b class="num"><span class="pos">${U.brl(rdTotReceita)}</span> <span class="muted">receita</span> · <span class="neg">${U.brl(rdTotDespesa)}</span> <span class="muted">despesa</span></b>
+        <div id="chart-rd"></div>
+        <div style="display:flex;gap:8px;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:center">
+          <div style="flex:1"><div class="muted" style="font-size:11px">Receita</div><div class="num pos" style="font-size:13.5px;font-weight:700;white-space:nowrap">${brlCheio(rdTotReceita)}</div></div>
+          <div style="flex:1"><div class="muted" style="font-size:11px">Despesa</div><div class="num neg" style="font-size:13.5px;font-weight:700;white-space:nowrap">${brlCheio(rdTotDespesa)}</div></div>
+          <div style="flex:1"><div class="muted" style="font-size:11px">Diferença</div><div class="num ${rdDif >= 0 ? "pos" : "neg"}" style="font-size:13.5px;font-weight:700;white-space:nowrap">${rdDif >= 0 ? "+" : "−"}${brlCheio(rdDif)}</div></div>
         </div>
       </div>
       <div class="card mt">

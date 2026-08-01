@@ -593,12 +593,13 @@ const Store = (() => {
     const custoAtual = r ? r.custo : null;
     const out = [];
     for (const h of inv().history) {
-      let pct = h.pct;
-      if (pct == null) {
-        const custoRef = h.custo != null ? h.custo : custoAtual;
-        if (custoRef && custoRef > 0 && h.rv != null) pct = Math.round(((h.rv - custoRef) / custoRef) * 10000) / 100;
+      const custoRef = h.custo != null ? h.custo : custoAtual;
+      let pct = h.pct, ganho = null;
+      if (h.rv != null && custoRef && custoRef > 0) {
+        ganho = Math.round((h.rv - custoRef) * 100) / 100;
+        if (pct == null) pct = Math.round(((h.rv - custoRef) / custoRef) * 10000) / 100;
       }
-      if (pct != null) out.push({ ym: h.date, saldo: pct });
+      if (pct != null) out.push({ ym: h.date, saldo: pct, ganho });
     }
     return out;
   }
