@@ -567,16 +567,40 @@ const Store = (() => {
     return { custo, atual, ganho, pct: (ganho / custo) * 100 };
   }
 
-  // Guarda cotações novas e registra o snapshot do dia no histórico
+  // Guarda cotações novas e registra o snapshot do dia no histórico (com custo/rentabilidade para o
+  // gráfico de rentabilidade ao longo do tempo).
   function saveQuotes(mapa) {
     Object.assign(inv().quotes, mapa);
     const hoje = U.hojeISO();
     const rv = rvTotal(), rf = rfTotal();
-    const snap = { date: hoje, rv: Math.round(rv * 100) / 100, rf: Math.round(rf * 100) / 100, total: Math.round((rv + rf) * 100) / 100 };
+    const rent = carteiraRentabilidade();
+    const snap = {
+      date: hoje, rv: Math.round(rv * 100) / 100, rf: Math.round(rf * 100) / 100, total: Math.round((rv + rf) * 100) / 100,
+      custo: rent ? Math.round(rent.custo * 100) / 100 : null,
+      pct: rent ? Math.round(rent.pct * 100) / 100 : null
+    };
     const idx = inv().history.findIndex(h => h.date === hoje);
     if (idx >= 0) inv().history[idx] = snap; else inv().history.push(snap);
     if (inv().history.length > 730) inv().history = inv().history.slice(-730);
     save();
+  }
+
+  // Série da rentabilidade da carteira (%) ao longo do tempo, a partir do histórico de snapshots.
+  // Snapshots novos já guardam `pct`; os antigos (sem custo) são estimados com o custo ATUAL (as
+  // posições costumam ser estáveis) — vira exato conforme novos pontos vão sendo gravados.
+  function rentabilidadeSerie() {
+    const r = carteiraRentabilidade();
+    const custoAtual = r ? r.custo : null;
+    const out = [];
+    for (const h of inv().history) {
+      let pct = h.pct;
+      if (pct == null) {
+        const custoRef = h.custo != null ? h.custo : custoAtual;
+        if (custoRef && custoRef > 0 && h.rv != null) pct = Math.round(((h.rv - custoRef) / custoRef) * 10000) / 100;
+      }
+      if (pct != null) out.push({ ym: h.date, saldo: pct });
+    }
+    return out;
   }
 
   // Dividendos: guarda o histórico por cota de cada ativo ({ ticker: {list:[{value,payDate}], updatedAt} }).
@@ -909,7 +933,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
