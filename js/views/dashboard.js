@@ -45,13 +45,15 @@ const ViewDashboard = (() => {
       const ymStr = U.ym(anoReal, mm);
       const lista = [];
       for (const it of st.flowItems) {
-        if (it.dueDay == null || it.dueDay === "") continue;
+        if (it.autoCartao) continue; // a fatura entra pelo quadro de cartões
         const v = Store.plannedValue(it, ymStr);
         if (v == null || v === 0) continue;
         const c = Store.getCell(it.id, ymStr);
         if (c && c.status && c.status !== "PENDENTE") continue; // já pago/recebido
+        const temDia = it.dueDay != null && it.dueDay !== "";
         lista.push({
-          dia: U.diaVencimento(it.dueDay, anoReal, mm),
+          dia: temDia ? U.diaVencimento(it.dueDay, anoReal, mm) : 99, // sem dia → vai pro fim
+          semDia: !temDia,
           nome: it.name,
           valor: Math.abs(v),
           tipo: v > 0 ? "Receber" : "Pagar",
@@ -340,7 +342,7 @@ const ViewDashboard = (() => {
         </button>`);
       const itens = U.el(`<div class="venc-itens"></div>`);
       for (const v of g.itens) {
-        const data = String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
+        const data = v.semDia ? "s/ dia" : String(v.dia).padStart(2, "0") + "/" + String(g.mm).padStart(2, "0");
         itens.appendChild(U.el(`
           <div class="list-row">
             <span class="tag num" ${v.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${v.atrasado ? "⚠ " : ""}${data}</span>
