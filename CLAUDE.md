@@ -134,13 +134,16 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
 
 - **Resultado do mês — FONTE ÚNICA `Store.monthTotal(ym)`** (usada pelo Dashboard **e** pelo Fluxo
   Anual, para as duas telas baterem): Σ `projectedValue` dos itens do fluxo (itens Pago/Recebido contam
-  **0**, então mês todo quitado → Resultado 0). No **Dashboard**, os quadros **Resultado** e **Acumulado**
-  olham para o **PRÓXIMO mês** (`ymFatura = ymAdd(ymHoje,1)`), porque o mês atual costuma já estar
-  quitado (Resultado 0) e a compra do cartão do mês só vira fatura no mês seguinte — assim os números
-  acompanham as Despesas/Cartão, que também mostram a fatura vigente. Os cards **Receitas/Despesas do
-  mês** do topo continuam informativos do **mês atual** em valores cheios (`plannedValue` + avulsos +
-  `faturaTotal(ymFatura)` como despesa). ⚠️ A função antiga `Store.resultadoMes` (valores cheios +
-  fatura) foi **removida**; não recriar.
+  **0**, então mês todo quitado → Resultado 0). ⚠️ **`projectedValue` checa o STATUS ANTES do valor**:
+  célula marcada Pago/Recebido conta **0 mesmo que tenha valor digitado no mês** (o valor já foi para o
+  saldo via `settledValue`). Era um bug (checava o valor primeiro): item com valor próprio marcado continuava
+  somando no Resultado e "inflava" o Dashboard. **Dashboard** (topo): três quadros — **Saldo em conta**,
+  **A receber / A pagar** do mês de trabalho (Σ `projectedValue` pendente: >0 a receber + `loansAReceberMes`;
+  <0 a pagar, inclui a fatura via item `autoCartao`) e **No fim de <mês> (previsto)** = `saldoContaAtual + a
+  receber − a pagar`. Marcar Pago/Recebido tira do "a receber/a pagar" e mexe no saldo → o "No fim" fica
+  estável. Os antigos cards Receitas/Despesas/Resultado/Acumulado/Saldo-projetado do topo foram **removidos**
+  (`plannedValue` segue no store, sem uso no dashboard). ⚠️ A função antiga `Store.resultadoMes` foi
+  **removida**; não recriar.
 
 - **Acumulado (Dashboard) = saldo previsto na conta no FIM do PRÓXIMO mês**, não `saldo + resultado`.
   É `saldoProjecaoSerie().find(p => p.ym === ymFatura).saldo`: parte do `saldoContaAtual` e soma **só o
