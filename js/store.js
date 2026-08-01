@@ -148,6 +148,9 @@ const Store = (() => {
     if (st.investments && !st.investments.dividends) st.investments.dividends = {};
     // Dividendos lançados manualmente pelo usuário (idempotente).
     if (st.investments && !st.investments.dividendsManual) st.investments.dividendsManual = {};
+    // Mês a partir do qual os dados do fluxo são reais (antes disso não havia automação) — usado no
+    // gráfico Receita × Despesa para não projetar meses velhos. Padrão: mês em que este app rodou 1ª vez.
+    if (st.settings && st.settings.fluxoDesde === undefined) st.settings.fluxoDesde = U.ymHoje();
     return st;
   }
 
@@ -352,6 +355,10 @@ const Store = (() => {
   // Receita e despesa TOTAIS (cheias, valores do fluxo) de um mês — para o gráfico receita x despesa.
   // Usa plannedValue (ignora status, mostra o total planejado). A fatura entra pela cheia do mês.
   function receitaDespesaMes(ymStr) {
+    // Meses anteriores ao início dos dados reais (settings.fluxoDesde) ficam ZERADOS no gráfico
+    // (antes disso o fluxo não estava na automação, então a projeção não vale).
+    const desde = state.settings && state.settings.fluxoDesde;
+    if (desde && ymStr < desde) return { receita: 0, despesa: 0 };
     let receita = 0, despesa = 0;
     for (const it of state.flowItems) {
       if (it.autoCartao) { despesa += faturaTotal(ymStr, null); continue; }

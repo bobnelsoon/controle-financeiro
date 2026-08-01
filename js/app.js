@@ -41,8 +41,10 @@ const App = (() => {
   // "Mês de trabalho" global: o usuário trabalha um mês à frente. Por padrão é a FATURA VIGENTE
   // (Store.faturaVigenteYm — mês seguinte, avançando na data de fechamento). O seletor no Dashboard
   // navega meses (só na sessão; ao reabrir volta ao mês de trabalho automático).
+  // Mês de trabalho = MÊS ATUAL (o fluxo/receitas/despesas/vencimentos são do mês corrente). O
+  // quadro de cartões é o único que olha a FATURA VIGENTE (mês seguinte), à parte.
   let navYm = null;
-  function mesRef() { return navYm || Store.faturaVigenteYm(); }
+  function mesRef() { return navYm || U.ymHoje(); }
   function mesRefShift(delta) { navYm = U.ymAdd(mesRef(), delta); render(); }
   function mesRefReset() { navYm = null; render(); }
   function mesRefAuto() { return navYm == null; }

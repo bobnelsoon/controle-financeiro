@@ -107,14 +107,13 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     "⚠️ Cheque especial em uso: <valor>" (só aviso — o negativo já está embutido no saldo/projeção; não vira
     lançamento pra não contar em dobro).
   - `cardTx[].ym` guarda o mês de pagamento da fatura.
-  - **Mês de trabalho global** (`App.mesRef()`): o usuário trabalha **um mês à frente**, então o **Dashboard
-    inteiro** (Receitas/Despesas/Resultado/Acumulado/Cartões) olha **um único mês** — o `App.mesRef()`, padrão
-    = `Store.faturaVigenteYm()` (mês seguinte avançando na **data de fechamento** via `minFech`, ou se a fatura
-    já está paga). O Dashboard tem um seletor **‹ Mês ›** que navega (só na sessão, `navYm`; **↺** volta ao
-    automático). **Lançamentos** abre nesse mês (`mesSel` inicia em `App.mesRef()`) e o **Fluxo Anual** destaca
-    a coluna dele. Os **Próximos vencimentos** continuam ancorados na **data REAL** de hoje (não no mês de
-    trabalho). Substituiu o esquema antigo (topo no mês atual + Resultado/Cartões no mês+1) e o auto-advance
-    local dos cartões — agora tudo deriva de `mesRef`.
+  - **Mês de trabalho global** (`App.mesRef()`): o **fluxo** do Dashboard (A receber / A pagar / No fim /
+    seletor / Lançamentos / coluna do Fluxo) olha o **MÊS ATUAL** — `App.mesRef()` padrão = `U.ymHoje()`
+    (⚠️ **não** é mais `faturaVigenteYm`: o usuário quer ver o mês corrente, que ainda tem itens a receber/pagar;
+    era o bug de "aparecia setembro"). O **quadro de cartões é o ÚNICO à parte**: usa `Store.faturaVigenteYm()`
+    (fatura vigente = mês seguinte, avançando na data de fechamento) → "fatura de <mês+1> (gastos de <mês>)".
+    Seletor **‹ Mês ›** navega só na sessão (`navYm`; **↺** volta ao automático). **Próximos vencimentos**
+    seguem a **data REAL** de hoje.
   - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init
     idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.
     `faturaRestante(ym, accountId)` = `faturaTotal − pago` (compras novas numa fatura já paga voltam a
@@ -165,7 +164,9 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   `loansAReceberMes`** (empréstimos ABERTOS a receber no mês). ⚠️ O gráfico do Dashboard **NÃO** é mais a
   projeção de saldo: virou **"Receita × Despesa — <ano>"** (2 linhas mês a mês, `Charts.receitaDespesaChart`
   + `Store.receitaDespesaSerie(ano)` com valores CHEIOS via `plannedValue` + fatura cheia; rodapé em **3
-  colunas** — Receita · Despesa · **Diferença** — valores sem centavos, sem quebra de linha).
+  colunas** — Receita · Despesa · **Diferença** — valores sem centavos, sem quebra de linha). Meses **antes de
+  `settings.fluxoDesde`** (init idempotente no `migrate` = `U.ymHoje()` na 1ª vez; p/ o usuário = `2026-08`)
+  ficam **ZERADOS** no gráfico — antes disso o fluxo não estava na automação.
   `saldoProjecaoSerie` segue no store (sem uso no dashboard agora).
   ⚠️ A linha do **Fluxo Anual chama-se "Saldo na conta (fim do mês)" e NÃO acumula** (decisão do usuário —
   a soma empilhada dava um número irreal lá na frente): cada mês = `saldoContaAtual + monthTotal(mês) +
