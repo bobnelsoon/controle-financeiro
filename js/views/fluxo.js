@@ -214,6 +214,19 @@ const ViewFluxo = (() => {
     body.appendChild(U.el(`<tr class="grupo"><td>RECEITAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of receitas) body.appendChild(linhaItem(it, meses, ymAtual));
 
+    // Linha (só leitura) dos EMPRÉSTIMOS a receber — vêm da aba Empréstimos (não são flowItems), mas
+    // já entram na cascata via loansAReceberMes; aqui é só pra ficar tudo visível no fluxo. Mostra o
+    // que ainda falta receber (parcelas ABERTAS) por mês; marcar como recebido é na aba Empréstimos.
+    if (st.loans.some(l => (l.items || []).length)) {
+      const trEmp = U.el(`<tr><td style="cursor:pointer" title="Empréstimos a receber — editar/receber na aba Empréstimos">💠 Empréstimo <span class="muted" style="font-size:10px">· a receber</span></td></tr>`);
+      for (const mm of meses) {
+        const v = Store.loansAReceberMes(mm);
+        trEmp.appendChild(U.el(`<td class="num ${v > 0 ? "pos" : "muted"}" style="text-align:right">${v > 0 ? v.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : ""}</td>`));
+      }
+      trEmp.querySelector("td").addEventListener("click", () => { location.hash = "#emprestimos"; });
+      body.appendChild(trEmp);
+    }
+
     body.appendChild(U.el(`<tr class="grupo"><td>DESPESAS</td>${meses.map(() => "<td></td>").join("")}</tr>`));
     for (const it of despesas) body.appendChild(linhaItem(it, meses, ymAtual));
 
