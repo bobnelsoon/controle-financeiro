@@ -26,6 +26,10 @@ const ViewCombustivel = (() => {
     const faturaDefault = linked ? linked.ym : Store.faturaDaCompra(e.cardId || (cartoes[0] && cartoes[0].id), e.date || U.hojeISO());
     const cartaoOpts = cartoes.map(a => `<option value="${a.id}" ${e.cardId === a.id ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
     const ehCartao = e.payment === "cartao";
+    // Conveniência lançada no mesmo pagamento (compra à parte, mesma fatura) — prefill ao editar.
+    const convLinked = (e.linkConvTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkConvTxId) : null;
+    const convVal = convLinked ? convLinked.value : null;
+    const convDesc = convLinked ? convLinked.desc : "";
 
     const ov = UI.modal(entry ? "Editar abastecimento" : "Novo abastecimento", `
       <div class="fld-2">
@@ -55,7 +59,11 @@ const ViewCombustivel = (() => {
           <label class="fld"><span>Qual cartão?</span><select name="cartao">${cartaoOpts}</select></label>
           <label class="fld"><span>Entra na fatura de</span><input type="month" name="fatura" value="${faturaDefault}"></label>
         </div>
-        <p class="muted" style="font-size:12px">O valor do combustível entra na <b>fatura do cartão</b> (tela Cartões + Fluxo Anual). Editar/excluir este abastecimento atualiza a compra lá.</p>`
+        <div class="fld-2">
+          <label class="fld"><span>＋ Conveniência (opcional)</span><input type="text" name="conv" inputmode="decimal" value="${convVal != null ? convVal : ""}" placeholder="ex: 25,00"></label>
+          <label class="fld"><span>O que comprou?</span><input type="text" name="convDesc" value="${U.esc(convDesc || "")}" placeholder="ex: lanche / água"></label>
+        </div>
+        <p class="muted" style="font-size:12px">O valor do combustível entra na <b>fatura do cartão</b> (tela Cartões + Fluxo Anual). Editar/excluir este abastecimento atualiza a compra lá. Comprou algo na <b>conveniência no mesmo pagamento</b>? Preencha acima — vira uma compra à parte na mesma fatura e <b>não conta no consumo</b> do combustível.</p>`
         : `<p class="muted" style="font-size:12px">Nenhum cartão cadastrado. Cadastre um em <b>Financeiro → Cartões</b> para usar esta opção.</p>`}
       </div>
       <label class="fld"><span>Observação</span><input type="text" name="obs" value="${U.esc(e.obs || "")}" placeholder="ex: Completou tanque"></label>
@@ -80,25 +88,31 @@ const ViewCombustivel = (() => {
         toll: num(form.toll.value) || 0,
         obs: form.obs.value.trim(),
         full: form.full.checked,
-        payment: null, cardId: null, linkCardTxId: null
+        payment: null, cardId: null, linkCardTxId: null, linkConvTxId: null
       };
 
-      // Sincroniza com o financeiro: remove o vínculo antigo e (re)cria conforme a forma escolhida.
+      // Sincroniza com o financeiro: remove os vínculos antigos e (re)cria conforme a forma escolhida.
       if (entry && entry.linkCardTxId) Store.removeCardTx(entry.linkCardTxId);
+      if (entry && entry.linkConvTxId) Store.removeCardTx(entry.linkConvTxId);
       const forma = form.forma ? form.forma.value : "";
       const cardId = form.cartao ? form.cartao.value : "";
-      if (forma === "cartao" && temAbast && total != null && cardId) {
-        const txId = U.id();
-        const descLocal = dados.local ? " - " + dados.local : "";
-        Store.addCardTx({
-          id: txId,
-          ym: (form.fatura && form.fatura.value) || U.ymAdd(dados.date.slice(0, 7), 1),
-          accountId: cardId,
-          desc: "Combustível" + descLocal,
-          value: Math.abs(total),
-          date: dados.date
-        });
-        dados.payment = "cartao"; dados.cardId = cardId; dados.linkCardTxId = txId;
+      if (forma === "cartao" && cardId) {
+        const faturaYm = (form.fatura && form.fatura.value) || U.ymAdd(dados.date.slice(0, 7), 1);
+        // Combustível
+        if (temAbast && total != null) {
+          const txId = U.id();
+          const descLocal = dados.local ? " - " + dados.local : "";
+          Store.addCardTx({ id: txId, ym: faturaYm, accountId: cardId, desc: "Combustível" + descLocal, value: Math.abs(total), date: dados.date });
+          dados.payment = "cartao"; dados.cardId = cardId; dados.linkCardTxId = txId;
+        }
+        // Conveniência no mesmo pagamento: compra à parte, mesma fatura (não entra no consumo).
+        const convVal = num(form.conv ? form.conv.value : null);
+        if (convVal != null && convVal > 0) {
+          const convId = U.id();
+          const convDesc = (form.convDesc && form.convDesc.value.trim()) || "Conveniência";
+          Store.addCardTx({ id: convId, ym: faturaYm, accountId: cardId, desc: convDesc, value: Math.abs(convVal), date: dados.date });
+          dados.payment = "cartao"; dados.cardId = cardId; dados.linkConvTxId = convId;
+        }
       }
 
       if (entry) Store.updateFuel(entry.id, dados);
@@ -439,9 +453,10 @@ const ViewAbastecimentos = (() => {
         </tr>`);
       tr.querySelector(".ed").addEventListener("click", () => ViewCombustivel.abrirForm(e));
       tr.querySelector(".rm").addEventListener("click", () => {
-        const aviso = e.linkCardTxId ? " A compra vinculada também sairá da fatura do cartão." : "";
+        const aviso = (e.linkCardTxId || e.linkConvTxId) ? " A(s) compra(s) vinculada(s) também sairá(ão) da fatura do cartão." : "";
         UI.confirmar(`Excluir o registro de ${U.dataBR(e.date)}?${aviso}`, () => {
           if (e.linkCardTxId) Store.removeCardTx(e.linkCardTxId);
+          if (e.linkConvTxId) Store.removeCardTx(e.linkConvTxId);
           Store.removeFuel(e.id);
           App.render();
         });
