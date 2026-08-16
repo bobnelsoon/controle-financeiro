@@ -152,5 +152,5 @@ const ViewLancamentos = (() => {
     }
   }
 
-  return { render };
+  return { render, abrirNovo };
 })();
