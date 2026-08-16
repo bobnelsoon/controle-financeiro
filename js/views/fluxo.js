@@ -283,6 +283,17 @@ const ViewFluxo = (() => {
       trTotal.appendChild(U.el(`<td class="num ${v == null ? "" : U.clsValor(v)}" style="text-align:right">${fmtCel(v)}</td>`));
     }
     body.appendChild(trTotal);
+
+    // Abre já rolado no MÊS DE TRABALHO (atual): a 1ª coluna (Item) é fixa, então posicionamos o mês
+    // logo depois dela em vez de começar em janeiro. Só rola pra frente (se o mês estiver à direita).
+    const wrap = root.querySelector(".fluxo-wrap");
+    const thMes = root.querySelector(".fluxo th.mes-atual");
+    const thItem = root.querySelector(".fluxo th:first-child");
+    if (wrap && thMes) {
+      const itemW = thItem ? thItem.offsetWidth : 0;
+      const delta = thMes.getBoundingClientRect().left - wrap.getBoundingClientRect().left - itemW - 4;
+      if (delta > 0) wrap.scrollLeft += delta;
+    }
   }
 
   return { render };
