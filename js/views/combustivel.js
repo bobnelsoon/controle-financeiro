@@ -30,6 +30,14 @@ const ViewCombustivel = (() => {
       if (ult) { defFuel = ult.fuelType; defPayCartao = ult.payment === "cartao"; defCardId = ult.cardId || defCardId; }
     }
     const tipoOpts = TIPOS.map(([v, l]) => `<option value="${v}" ${defFuel === v ? "selected" : ""}>${l}</option>`).join("");
+    // Cidades/locais já usados no histórico (mais recentes primeiro) → autocomplete do campo Local.
+    const locaisVistos = [];
+    for (const x of ((Store.state.fuel && Store.state.fuel.entries) || []).slice()
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))) {
+      const loc = (x.local || "").trim();
+      if (loc && !locaisVistos.includes(loc)) locaisVistos.push(loc);
+    }
+    const localOpts = locaisVistos.map(l => `<option value="${U.esc(l)}"></option>`).join("");
     const cartoes = Store.state.accounts.filter(a => a.type === "cartao");
     const linked = (e.linkCardTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkCardTxId) : null;
     const faturaDefault = linked ? linked.ym : Store.faturaDaCompra(defCardId || (cartoes[0] && cartoes[0].id), e.date || U.hojeISO());
@@ -54,7 +62,7 @@ const ViewCombustivel = (() => {
         <label class="fld"><span>Total (R$)</span><input type="text" name="total" inputmode="decimal" value="${e.total != null ? e.total : ""}" placeholder="ex: 164,70"></label>
       </div>
       <div class="fld-2">
-        <label class="fld"><span>Local</span><input type="text" name="local" value="${U.esc(e.local || "")}" placeholder="ex: cidade / posto"></label>
+        <label class="fld"><span>Local</span><input type="text" name="local" value="${U.esc(e.local || "")}" placeholder="ex: cidade / posto" list="comb-locais" autocomplete="off"><datalist id="comb-locais">${localOpts}</datalist></label>
         <label class="fld"><span>Pedágio (R$)</span><input type="text" name="toll" inputmode="decimal" value="${e.toll ? e.toll : ""}" placeholder="ex: 0"></label>
       </div>
       <label class="fld"><span>Forma de pagamento</span>
