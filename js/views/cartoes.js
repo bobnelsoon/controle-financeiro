@@ -33,10 +33,22 @@ const ViewCartoes = (() => {
     });
   }
 
+  // Último cartão usado = cartão do lançamento mais recente (por data; empate = o inserido depois).
+  // Ignora lançamentos de cartões que não existem mais.
+  function ultimoCartaoUsado() {
+    let best = null;
+    for (const t of (Store.state.cardTx || [])) {
+      if (!Store.state.accounts.some(a => a.id === t.accountId && a.type === "cartao")) continue;
+      if (!best || String(t.date || "").localeCompare(String(best.date || "")) >= 0) best = t;
+    }
+    return best ? best.accountId : null;
+  }
+
   function abrirNovaCompra(accountId) {
+    // Sem cartão específico (menu Adicionar / botão do topo): abre no ÚLTIMO cartão utilizado.
+    const contaInicial = accountId || ultimoCartaoUsado() || (Store.state.accounts[0] && Store.state.accounts[0].id);
     const contas = Store.state.accounts.map(a =>
-      `<option value="${a.id}" ${a.id === accountId ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
-    const contaInicial = accountId || (Store.state.accounts[0] && Store.state.accounts[0].id);
+      `<option value="${a.id}" ${a.id === contaInicial ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
     const faturaInicial = Store.faturaDaCompra(contaInicial, U.hojeISO());
     const ov = UI.modal("Nova compra no cartão", `
       <label class="fld"><span>Cartão</span><select name="conta">${contas}</select></label>
