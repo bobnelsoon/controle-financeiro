@@ -20,12 +20,21 @@ const ViewCombustivel = (() => {
   // Formulário de novo/editar abastecimento (usado pelas duas abas).
   function abrirForm(entry) {
     const e = entry || {};
-    const tipoOpts = TIPOS.map(([v, l]) => `<option value="${v}" ${e.fuelType === v ? "selected" : ""}>${l}</option>`).join("");
+    // Lançamento NOVO: herda combustível e forma de pagamento do ÚLTIMO abastecimento (por data).
+    // Ao editar, mantém os do próprio registro.
+    let defFuel = e.fuelType, defPayCartao = e.payment === "cartao", defCardId = e.cardId;
+    if (!entry) {
+      const ents = ((Store.state.fuel && Store.state.fuel.entries) || []).slice()
+        .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+      const ult = [...ents].reverse().find(x => x.fuelType); // último abastecimento de verdade (ignora só-pedágio)
+      if (ult) { defFuel = ult.fuelType; defPayCartao = ult.payment === "cartao"; defCardId = ult.cardId || defCardId; }
+    }
+    const tipoOpts = TIPOS.map(([v, l]) => `<option value="${v}" ${defFuel === v ? "selected" : ""}>${l}</option>`).join("");
     const cartoes = Store.state.accounts.filter(a => a.type === "cartao");
     const linked = (e.linkCardTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkCardTxId) : null;
-    const faturaDefault = linked ? linked.ym : Store.faturaDaCompra(e.cardId || (cartoes[0] && cartoes[0].id), e.date || U.hojeISO());
-    const cartaoOpts = cartoes.map(a => `<option value="${a.id}" ${e.cardId === a.id ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
-    const ehCartao = e.payment === "cartao";
+    const faturaDefault = linked ? linked.ym : Store.faturaDaCompra(defCardId || (cartoes[0] && cartoes[0].id), e.date || U.hojeISO());
+    const cartaoOpts = cartoes.map(a => `<option value="${a.id}" ${defCardId === a.id ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
+    const ehCartao = defPayCartao;
     // Conveniência lançada no mesmo pagamento (compra à parte, mesma fatura) — prefill ao editar.
     const convLinked = (e.linkConvTxId && Store.state.cardTx) ? Store.state.cardTx.find(t => t.id === e.linkConvTxId) : null;
     const convVal = convLinked ? convLinked.value : null;
