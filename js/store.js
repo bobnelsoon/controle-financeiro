@@ -316,6 +316,55 @@ const Store = (() => {
     return ym;
   }
 
+  // Janela de pagamento (dia 28 de um mês → dia 10 do seguinte): despesas fixas + faturas de cartão que
+  // vencem nessa faixa e ainda estão PENDENTES. Ancorada em hoje: se hoje <= 10, a janela é a que começou
+  // no dia 28 do mês passado; senão, a que começa no dia 28 deste mês. Devolve { iniISO, fimISO, itens }.
+  function janelaPagamento() {
+    const diaHoje = new Date().getDate();
+    const ymHoje = U.ymHoje();
+    const ymA = diaHoje <= 10 ? U.ymAdd(ymHoje, -1) : ymHoje; // mês do "28"
+    const ymB = U.ymAdd(ymA, 1);                              // mês do "10"
+    const lastDay = (ym) => { const { y, m } = U.ymParse(ym); return new Date(y, m, 0).getDate(); };
+    const iso = (ym, dia) => ym + "-" + String(Math.min(dia, lastDay(ym))).padStart(2, "0");
+    const hojeISO = U.hojeISO();
+    const itens = [];
+
+    // Despesas fixas do fluxo com dia de vencimento na faixa (28..fim do mês A) ou (1..10 do mês B).
+    const pA = U.ymParse(ymA), pB = U.ymParse(ymB);
+    for (const it of state.flowItems) {
+      if (it.kind !== "despesa" || it.autoCartao) continue;
+      if (it.dueDay == null || it.dueDay === "") continue;
+      const diaA = U.diaVencimento(it.dueDay, pA.y, pA.m);
+      const diaB = U.diaVencimento(it.dueDay, pB.y, pB.m);
+      let ym = null, dia = null;
+      if (diaA != null && diaA >= 28) { ym = ymA; dia = diaA; }
+      else if (diaB != null && diaB <= 10) { ym = ymB; dia = diaB; }
+      else continue;
+      const c = getCell(it.id, ym);
+      if (c && c.status && c.status !== "PENDENTE") continue; // já pago
+      const v = plannedValue(it, ym);
+      if (v == null || v >= 0) continue; // só despesa (valor negativo)
+      itens.push({ tipo: "flow", id: it.id, ym, nome: it.name, dia, dataISO: iso(ym, dia), valor: Math.abs(v) });
+    }
+
+    // Faturas de cartão que vencem na janela (pelo dia de vencimento do cartão) e ainda têm saldo.
+    for (const a of state.accounts) {
+      if (a.type !== "cartao" || a.dueDay == null) continue;
+      const d = Number(a.dueDay);
+      let ym = null;
+      if (d >= 28) ym = ymA;
+      else if (d >= 1 && d <= 10) ym = ymB;
+      else continue;
+      const rest = faturaRestante(ym, a.id);
+      if (rest <= 0.005) continue;
+      itens.push({ tipo: "fatura", id: a.id, ym, nome: "Fatura " + a.name, dia: d, dataISO: iso(ym, d), valor: rest });
+    }
+
+    itens.sort((x, y) => x.dataISO.localeCompare(y.dataISO));
+    for (const i of itens) i.atrasado = i.dataISO < hojeISO;
+    return { iniISO: iso(ymA, 28), fimISO: iso(ymB, 10), itens };
+  }
+
   // Valor planejado do mês (ignora status) — usado no painel do mês
   function plannedValue(item, ymStr) {
     const c = getCell(item.id, ymStr);
@@ -962,7 +1011,7 @@ const Store = (() => {
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
-    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes,
+    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes, janelaPagamento,
     inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,

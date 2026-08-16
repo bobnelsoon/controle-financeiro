@@ -195,6 +195,15 @@ table.tbl.tbl-proj { min-width: 0; font-size: 12.5px; }
 .tbl-proj .proj-det > td { padding: 2px 5px 8px; }
 .tbl-proj .proj-det .list-row { border-bottom: 1px dashed var(--grid); }
 
+/* Janela de pagamento (dashboard): lista com checkbox por conta + pagar selecionadas */
+.jp-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--grid); cursor: pointer; }
+.jp-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.jp-row .grow { font-size: 14px; }
+.jp-all { border-bottom: 1px solid var(--border); }
+.jp-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.jp-foot .btn-pay { padding: 9px 14px; font-weight: 700; color: #fff; }
+.jp-foot .btn-pay:disabled { opacity: .5; }
+
 /* Cartões no dashboard: lista compacta em colunas (nome — valor) */
 .cartoes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .cartoes-head a:hover { color: var(--accent); }

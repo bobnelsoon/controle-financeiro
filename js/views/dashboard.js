@@ -136,6 +136,10 @@ const ViewDashboard = (() => {
     const rentSinal = rent && rent.ganho >= 0 ? "+" : "";
     const rentPctTxt = rent ? rent.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
 
+    // Janela de pagamento (28 → 10): contas a pagar na faixa, com seleção múltipla.
+    const janela = Store.janelaPagamento();
+    const fmtDiaMesISO = iso => { const p = iso.split("-"); return p[2] + "/" + U.MESES_ABREV[Number(p[1]) - 1].toLowerCase(); };
+
     root.innerHTML = `
       <div class="page-head">
         <h1>Dashboard</h1>
@@ -198,6 +202,13 @@ const ViewDashboard = (() => {
           <span>${totalRestante > 0 ? "Em aberto (a pagar)" : "Tudo pago ✓"}</span>
           <b class="num ${totalRestante > 0 ? "neg" : "pos"}">${U.brl(totalRestante)}</b>
         </div>
+      </div>` : ""}
+
+      ${janela.itens.length ? `
+      <div class="card mt">
+        <h2 class="section" style="margin-bottom:2px">🗓️ Janela de pagamento</h2>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">vence entre <b>${fmtDiaMesISO(janela.iniISO)}</b> e <b>${fmtDiaMesISO(janela.fimISO)}</b> · marque o que já pagou</div>
+        <div id="dash-janela"></div>
       </div>` : ""}
 
       <div class="card mt">
@@ -323,6 +334,57 @@ const ViewDashboard = (() => {
       }
       compEl.appendChild(bar);
       compEl.appendChild(leg);
+    }
+
+    // Janela de pagamento: lista com checkboxes + "pagar selecionadas" (marca tudo de uma vez).
+    const janelaEl = root.querySelector("#dash-janela");
+    if (janelaEl && janela.itens.length) {
+      const allRow = U.el(`<label class="jp-row jp-all"><input type="checkbox" id="jp-all"><span class="grow muted">Selecionar todas</span></label>`);
+      janelaEl.appendChild(allRow);
+      for (const it of janela.itens) {
+        const dataTxt = fmtDiaMesISO(it.dataISO);
+        const row = U.el(`
+          <label class="jp-row">
+            <input type="checkbox" class="jp-chk">
+            <span class="tag num" ${it.atrasado ? 'style="color:var(--critical);border-color:var(--critical)"' : ""}>${it.atrasado ? "⚠ " : ""}${dataTxt}</span>
+            <span class="grow">${it.tipo === "fatura" ? "💳 " : ""}${U.esc(it.nome)}</span>
+            <span class="num neg">${U.brl(it.valor)}</span>
+          </label>`);
+        const chk = row.querySelector(".jp-chk");
+        chk.dataset.tipo = it.tipo; chk.dataset.id = it.id; chk.dataset.ym = it.ym; chk.dataset.valor = it.valor;
+        janelaEl.appendChild(row);
+      }
+      const foot = U.el(`
+        <div class="jp-foot">
+          <span class="muted" style="font-size:13px">Selecionado (<span id="jp-n">0</span>) <b class="num neg" id="jp-tot" style="font-size:15px">${U.brl(0)}</b></span>
+          <button class="btn-primary btn-pay" id="jp-pagar" disabled>✓ Pagar selecionadas</button>
+        </div>`);
+      janelaEl.appendChild(foot);
+
+      const chks = () => [...janelaEl.querySelectorAll(".jp-chk")];
+      const atualiza = () => {
+        const sel = chks().filter(c => c.checked);
+        const tot = sel.reduce((s, c) => s + Number(c.dataset.valor), 0);
+        janelaEl.querySelector("#jp-n").textContent = sel.length;
+        janelaEl.querySelector("#jp-tot").textContent = U.brl(tot);
+        janelaEl.querySelector("#jp-pagar").disabled = sel.length === 0;
+        const all = janelaEl.querySelector("#jp-all");
+        all.checked = sel.length === chks().length;
+      };
+      chks().forEach(c => c.addEventListener("change", atualiza));
+      janelaEl.querySelector("#jp-all").addEventListener("change", (e) => { chks().forEach(c => c.checked = e.target.checked); atualiza(); });
+      janelaEl.querySelector("#jp-pagar").addEventListener("click", () => {
+        const sel = chks().filter(c => c.checked);
+        if (!sel.length) return;
+        const tot = sel.reduce((s, c) => s + Number(c.dataset.valor), 0);
+        UI.confirmar(`Marcar ${sel.length} conta(s) como paga(s)? Total ${U.brl(tot)}.\n\nO valor sai do Saldo em conta e some do "a pagar" no Fluxo e no Dashboard.`, () => {
+          for (const c of sel) {
+            if (c.dataset.tipo === "fatura") Store.pagarFatura(c.dataset.id, c.dataset.ym);
+            else Store.setCell(c.dataset.id, c.dataset.ym, { value: -Math.abs(Number(c.dataset.valor)), status: "PAGO" });
+          }
+          App.render();
+        });
+      });
     }
 
     // Próximos meses (mini-tabela): Mês · Entra · Sai · Saldo fim (cascata). Toca no mês → lançamentos.
