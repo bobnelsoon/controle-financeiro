@@ -138,6 +138,7 @@ const ViewDashboard = (() => {
 
     // Janela de pagamento (28 → 10): contas a pagar na faixa, com seleção múltipla.
     const janela = Store.janelaPagamento();
+    const janelaTotal = janela.itens.reduce((s, i) => s + i.valor, 0);
     const fmtDiaMesISO = iso => { const p = iso.split("-"); return p[2] + "/" + U.MESES_ABREV[Number(p[1]) - 1].toLowerCase(); };
 
     root.innerHTML = `
@@ -206,9 +207,15 @@ const ViewDashboard = (() => {
 
       ${janela.itens.length ? `
       <div class="card mt">
-        <h2 class="section" style="margin-bottom:2px">🗓️ Janela de pagamento</h2>
-        <div class="muted" style="font-size:12px;margin-bottom:8px">vence entre <b>${fmtDiaMesISO(janela.iniISO)}</b> e <b>${fmtDiaMesISO(janela.fimISO)}</b> · marque o que já pagou</div>
-        <div id="dash-janela"></div>
+        <button type="button" class="jp-head" id="jp-toggle" aria-expanded="false">
+          <span class="chev">▸</span>
+          <span class="jp-head-txt">
+            <span style="font-weight:600">🗓️ Janela de pagamento</span>
+            <span class="muted" style="font-size:11.5px">vence entre ${fmtDiaMesISO(janela.iniISO)} e ${fmtDiaMesISO(janela.fimISO)} · ${janela.itens.length} conta(s)</span>
+          </span>
+          <b class="num neg" style="white-space:nowrap">${U.brl(janelaTotal)}</b>
+        </button>
+        <div id="dash-janela" class="jp-body" hidden></div>
       </div>` : ""}
 
       <div class="card mt">
@@ -335,6 +342,16 @@ const ViewDashboard = (() => {
       compEl.appendChild(bar);
       compEl.appendChild(leg);
     }
+
+    // Janela de pagamento: minimizada por padrão — o cabeçalho abre/fecha a lista.
+    const jpToggle = root.querySelector("#jp-toggle");
+    if (jpToggle) jpToggle.addEventListener("click", () => {
+      const body = root.querySelector("#dash-janela");
+      const abrir = body.hidden;
+      body.hidden = !abrir;
+      jpToggle.classList.toggle("open", abrir);
+      jpToggle.setAttribute("aria-expanded", abrir);
+    });
 
     // Janela de pagamento: lista com checkboxes + "pagar selecionadas" (marca tudo de uma vez).
     const janelaEl = root.querySelector("#dash-janela");
