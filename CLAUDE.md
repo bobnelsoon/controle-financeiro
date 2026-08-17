@@ -65,9 +65,9 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   (`ViewCombustivel` = Resumo, `ViewAbastecimentos` = lista, `ViewVeiculo` = perfil/revisão/manutenção) +
   o form compartilhado `ViewCombustivel.abrirForm(entry)` e `ViewCombustivel.abrirImportar()`.
 - `js/views/inicio.js` — a **tela inicial (lançador)** `ViewInicio` (botões Financeiro / Combustível /
-  Adicionar / Atualizar), o menu **`Adicionar.abrirMenu()`** (Compra no cartão / Compra parcelada /
-  Abastecimento / Recebido / Pago) e **`Marcar.abrir(kind)`** (marca um item FIXO do fluxo como
-  RECEBIDO/receita ou PAGO/despesa via `Store.setCell`, atualizando saldo/fluxo/dashboard).
+  Adicionar / Atualizar) e o menu **`Adicionar.abrirMenu()`** (🛒 Compra no cartão / 🧾 Compra parcelada /
+  💸 Lançamento (pix/débito/cartão, → `ViewLancamentos.abrirNovo`) / ⛽ Abastecimento). **Recebido/Pago
+  saíram do menu** (o usuário marca isso direto no Fluxo Anual); o helper `Marcar` foi removido.
 - `js/app.js` — `App`: roteador por hash com **múltiplos controles**. `App.controles` mapeia cada controle
   (`inicio`, `financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. O controle `inicio` é a tela
   lançadora (sem abas — a nav fica vazia). `boot()` monta o seletor de controles + o botão **➕ Adicionar**
@@ -186,6 +186,11 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   Empréstimos. É **display-only**: a cascata já conta o empréstimo via `loansAReceberMes`, então **não conta
   em dobro** (não é um flowItem). Bate com o **"A receber" do Dashboard** (Σ `projectedValue`>0 pendente +
   `loansAReceberMes`), que puxa tudo do fluxo.
+  **A aba Fluxo Anual abre já ROLADA no mês de trabalho** (auto-scroll no fim do `render`: posiciona a
+  coluna `.mes-atual` logo após a 1ª coluna; só rola pra frente). A **1ª coluna (Item) é FIXA** (`position:
+  sticky`) — pra ela não vazar o conteúdo dos meses ao rolar: `z-index` acima dos headers (canto 4, coluna 3,
+  meses 2), `table.fluxo { border-collapse: separate }` (o `collapse` desalinha sticky no Chromium) e
+  `.fluxo-wrap` sem padding lateral (o conteúdo passava por baixo do padding do card).
   O quadro **"Próximos meses"** (ex-"Próximos vencimentos") do dash é uma **mini-tabela de projeção em
   cascata** (`.tbl-proj`, cabe sem rolagem): do mês REAL de hoje até dezembro, colunas **Mês · Entra · Sai ·
   Saldo fim** (R$ sem centavos). **Entra** = receitas pendentes + empréstimo (`loansAReceberMes`); **Sai** =
@@ -194,6 +199,14 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   "No fim de <mês>", encadeia). Toca no mês → abre os lançamentos (linha "Fatura do cartão" + itens **sem
   `dueDay`**: receita → Receber, despesa → Pagar, "s/ dia"; empréstimo "João — parcela"). O mês de trabalho
   abre expandido.
+  **Janela de pagamento** (card no Dashboard, `Store.janelaPagamento()`): junta "pagar várias de uma vez" +
+  "janela 28→10". Lista as **despesas fixas + faturas de cartão** que vencem entre o **dia 28 de um mês e o
+  dia 10 do seguinte** e ainda estão PENDENTES (ancorada em hoje: se hoje ≤ 10, é a janela que começou dia 28
+  do mês passado; senão a que começa dia 28 deste mês). Faturas entram pelo **dia de vencimento do cartão**;
+  só **despesas/faturas** (não receitas); atrasadas marcadas. O card abre **MINIMIZADO** (`.jp-head` mostra
+  nº de contas + total; toca pra abrir a lista `.jp-body`). Cada linha tem checkbox (`.jp-row`), há
+  "selecionar todas", total selecionado ao vivo e **"✓ Pagar selecionadas"** → marca tudo de uma vez
+  (despesa via `setCell` PAGO; fatura via `pagarFatura`), debitando do saldo. Some da lista ao pagar.
 
 - **Investimentos**: cada ativo tem `avgPrice` (preço médio pago); recompra recalcula média ponderada.
   Ganho/perda por ativo e a rentabilidade da carteira (`Store.carteiraRentabilidade`, em R$ e %,
@@ -269,6 +282,10 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
       usuário ou "Conveniência"), vinculada por `entry.linkConvTxId`. **NÃO entra no total do abastecimento**
       → consumo (km/l), preço do litro e custo/km continuam certos. Editar recria (sem duplicar) e excluir
       remove os dois `cardTx` (combustível + conveniência). Só aparece na caixa do cartão (é "mesmo pagamento").
+  - **Herança do último abastecimento**: um lançamento NOVO já vem com o **combustível** e a **forma de
+    pagamento** (incl. o cartão) do último abastecimento por data (ignora registros só-pedágio). Ao editar,
+    mantém os do próprio registro. O campo **Local** tem **autocomplete** (`<datalist>`) com as cidades/postos
+    do histórico (mais recentes 1º, sem repetir).
 
 ## Convenções de UI
 
@@ -281,9 +298,11 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
   display:none) — sobra espaço para as abas rolarem. O Adicionar no mobile fica pelo **FAB flutuante** `➕`
   (`.fab-add`, criado uma vez no `boot`, canto inferior direito, só no mobile via media query, escondido na
   tela inicial) que abre o mesmo menu. No desktop, o botão Adicionar continua na sidebar (sem FAB).
-- **Integração pelo Adicionar**: um lançamento atualiza os dois controles — Compra → `ViewCartoes.abrirNovaCompra`
-  (cartão + parcelas); Abastecimento → `ViewCombustivel.abrirForm` (pode cair no cartão); Recebido/Pago →
-  `Marcar.abrir` marca item fixo do fluxo (setCell com status), mexendo no saldo/fluxo/dashboard.
+- **Integração pelo Adicionar**: Compra → `ViewCartoes.abrirNovaCompra` (cartão + parcelas); Lançamento →
+  `ViewLancamentos.abrirNovo` (pix/débito/cartão + parcelas); Abastecimento → `ViewCombustivel.abrirForm`
+  (pode cair no cartão). **`ViewCartoes.abrirNovaCompra(null)` abre no ÚLTIMO cartão utilizado** (cartão do
+  `cardTx` mais recente por data; helper `ultimoCartaoUsado`) — abrir pelo "+ Compra" de um cartão respeita
+  aquele cartão.
 - Tabelas largas rolam dentro do `.card` no mobile (media query ≤700px); tabela de investimentos usa `.tbl-wide`.
 - Quadros/linhas com `data-goto` navegam para a aba (`.clickable[data-goto]` no dashboard).
 - Estilo por tokens CSS em `:root` (tema claro/escuro via `prefers-color-scheme`).
@@ -310,11 +329,21 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607196000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607199500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#62 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#70 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607199500`, PRs #64–#70):**
+- **Fluxo Anual** abre já **rolado no mês atual**, com a 1ª coluna (Item) fixa e sem vazamento (border-collapse
+  separate + z-index + sem padding lateral no `.fluxo-wrap`).
+- **Menu Adicionar**: tirou Recebido/Pago, entrou **💸 Lançamento** (`ViewLancamentos.abrirNovo`). `Marcar` removido.
+- **Combustível**: novo abastecimento **herda combustível + forma de pagamento** do último; campo **Local** com
+  autocomplete das cidades do histórico.
+- **Cartões**: "Nova compra" abre no **último cartão utilizado**.
+- **Dashboard — Janela de pagamento** (28→10): card **minimizável** que lista despesas+faturas da janela com
+  checkbox e **"Pagar selecionadas"** (paga várias de uma vez, debita do saldo). Junta as 2 ideias da fila.
 
 **Últimas melhorias (PUBLICADAS, cache `202607196000`, PRs #58–#62):**
 - **Fluxo**: no editor de item, botão **"Aplicar aos próximos meses"** (salva o novo padrão e limpa os
