@@ -705,7 +705,14 @@ const Store = (() => {
   function addDividendoManual(ticker, entry) {
     const m = dividendosManuais();
     if (!m[ticker]) m[ticker] = [];
-    m[ticker].push({ id: U.id(), value: entry.value, payDate: entry.payDate });
+    // Guarda o TOTAL recebido e a QTD de cotas do momento — assim aportar (mudar a qtd) não recalcula
+    // o histórico. `value` = por cota (só pra exibir/derivar).
+    m[ticker].push({
+      id: U.id(), value: entry.value,
+      total: entry.total != null ? entry.total : null,
+      qty: entry.qty != null ? entry.qty : null,
+      payDate: entry.payDate
+    });
     m[ticker].sort((a, b) => (a.payDate < b.payDate ? -1 : 1));
     save();
   }
@@ -743,18 +750,23 @@ const Store = (() => {
     for (const a of inv().assets) {
       const list = man[a.ticker] || [];
       if (!list.length) continue; // só ativos com lançamento manual
-      let ultimoPay = null, perCota = 0, n = 0;
+      let ultimoPay = null, tAtivo = 0, n = 0;
+      const lancs = [];
       for (const x of list) {
-        if (x.value == null || !x.payDate || x.payDate > hoje) continue; // ignora provento com data futura
-        perCota += x.value; n++;
+        if (!x.payDate || x.payDate > hoje) continue; // ignora provento com data futura
+        // Total do lançamento = o que foi GRAVADO (fixo); lançamentos antigos (sem total) caem no
+        // por-cota × qtd ATUAL como aproximação (o usuário pode relançar pra ficar exato).
+        const qty = x.qty != null ? x.qty : a.qty;
+        const tl = x.total != null ? x.total : (x.value != null ? Math.round(x.value * a.qty * 100) / 100 : 0);
+        tAtivo += tl; n++;
+        lancs.push({ id: x.id, payDate: x.payDate, value: x.value, qty, total: tl });
         if (!ultimoPay || x.payDate > ultimoPay) ultimoPay = x.payDate;
         if (!ultimoDisponivel || x.payDate > ultimoDisponivel) ultimoDisponivel = x.payDate;
       }
       if (n === 0) continue;
-      perCota = Math.round(perCota * 1e6) / 1e6;
-      const t = Math.round(perCota * a.qty * 100) / 100;
-      total += t;
-      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, perCota, total: t, n, ultimoPay });
+      tAtivo = Math.round(tAtivo * 100) / 100;
+      total += tAtivo;
+      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, total: tAtivo, n, ultimoPay, lancs });
     }
     total = Math.round(total * 100) / 100;
     const patr = rvTotal();
