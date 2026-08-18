@@ -313,6 +313,8 @@ label.fld input, label.fld select, label.fld textarea { width: 100%; }
 .fld-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 label.fld.fld-check { display: flex; align-items: center; gap: 8px; }
 label.fld.fld-check input { width: auto; }
+/* Campo em destaque (ex.: "Cotas nesta data" no lançamento de dividendo) */
+label.fld.fld-destaque { background: color-mix(in srgb, var(--accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 10px; padding: 8px 10px; }
 label.fld.fld-check > span { margin-bottom: 0; font-weight: 500; }
 label.fld textarea { font-family: inherit; font-size: 12.5px; resize: vertical; }
 tr.linha-pedagio td { color: var(--muted); }

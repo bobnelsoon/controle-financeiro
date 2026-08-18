@@ -137,16 +137,15 @@ const ViewInvestimentos = (() => {
     const qtyIni = aIni ? aIni.qty : 0;
     const ov = UI.modal("Lançar dividendo recebido", `
       <label class="fld"><span>Ativo</span><select name="ticker">${opts}</select></label>
+      <label class="fld fld-destaque"><span>📌 Cotas que você tinha NESTA DATA <span class="muted" style="font-weight:400;font-size:11px">— ajuste se o pagamento é de outro mês (ex.: recebido em agosto, referente a julho → use as cotas de julho)</span></span>
+        <input type="number" name="cotas" min="0" step="1" value="${qtyIni}"></label>
+      <label class="fld"><span>Data do pagamento</span><input type="date" name="data" value="${U.hojeISO()}" max="${U.hojeISO()}"></label>
       <div class="fld-2">
-        <label class="fld"><span>Data do pagamento</span><input type="date" name="data" value="${U.hojeISO()}" max="${U.hojeISO()}"></label>
-        <label class="fld"><span>Cotas nesta data</span><input type="number" name="cotas" min="0" step="1" value="${qtyIni}"></label>
-      </div>
-      <div class="fld-2">
+        <label class="fld"><span>Total recebido (R$)</span><input type="text" name="total" inputmode="decimal" placeholder="ex.: 8,75"></label>
         <label class="fld"><span>Valor por cota (R$)</span><input type="text" name="porCota" inputmode="decimal" placeholder="ex.: 0,10"></label>
-        <label class="fld"><span>Total recebido (R$)</span><input type="text" name="total" inputmode="decimal" placeholder="ex.: 7,50"></label>
       </div>
       <div id="ld-prev" class="muted" style="font-size:12.5px"></div>
-      <p class="muted" style="font-size:12px"><b>Cotas nesta data</b> = quantas cotas você tinha quando o provento foi apurado (ex.: se o pagamento de agosto é referente a julho, use as cotas de julho). Preencha <b>um</b> dos valores — o outro é calculado por essas cotas. Não é sobrescrito ao atualizar cotações.</p>
+      <p class="muted" style="font-size:12px">Informe o <b>total recebido</b> (ou o valor por cota) — o outro é calculado pelas <b>cotas nesta data</b>. O que você lança aqui é a fonte oficial (não muda ao atualizar cotações nem ao aportar depois).</p>
       <div id="ld-lista" class="mt"></div>
     `, (form) => {
       const ticker = form.ticker.value;
