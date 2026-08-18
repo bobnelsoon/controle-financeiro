@@ -322,15 +322,17 @@ const ViewInvestimentos = (() => {
       </div>
 
       <div class="card mb">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <b style="font-size:15px">💰 Dividendos recebidos</b>
-          <div class="row-gap" style="align-items:center">
-            <button class="btn-sm btn-primary" id="btn-lanc-div">＋ Lançar</button>
-            <label class="muted" style="font-size:12px">desde <input type="month" id="div-since" value="${div.since}" max="${U.ymHoje()}" style="width:auto;display:inline-block;padding:2px 6px"></label>
-          </div>
-        </div>
-        ${div.since > U.ymHoje() ? `<p class="muted" style="font-size:12px;color:var(--critical);margin:6px 0 0">⚠️ O mês escolhido (${U.ymLabel(div.since)}) está no futuro — nada foi recebido ainda. Escolha um mês passado (ex.: quando você comprou as cotas).</p>` : ""}
-        <div id="div-body" class="mt"></div>
+        <button type="button" class="dv-head" id="dv-toggle" aria-expanded="false">
+          <span class="chev">▸</span>
+          <span class="dv-head-txt">
+            <span style="font-weight:600;font-size:15px">💰 Dividendos recebidos</span>
+            ${div.total > 0 && div.yieldPct != null
+              ? `<span class="muted" style="font-size:11.5px">yield ${div.yieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% · sobre ações/FIIs</span>`
+              : `<span class="muted" style="font-size:11.5px">toque pra ver / lançar</span>`}
+          </span>
+          <b class="num ${div.total > 0 ? "pos" : "muted"}" style="font-size:16px;white-space:nowrap">${U.brl(div.total)}</b>
+        </button>
+        <div id="div-body" class="dv-body" hidden></div>
       </div>
 
       <div class="card mb">
@@ -373,33 +375,44 @@ const ViewInvestimentos = (() => {
     root.querySelector("#btn-imp-inv").addEventListener("click", abrirImportar);
     root.querySelector("#btn-rf").addEventListener("click", () => abrirRendaFixa(null));
 
-    // Card de dividendos: soma de tudo pago por cota desde `div.since` × cotas.
-    const mesLabel = (ym) => { const [y, m] = ym.split("-"); return U.MESES_ABREV[Number(m) - 1] + "/" + y.slice(2); };
-    const sinceEl = root.querySelector("#div-since");
-    if (sinceEl) sinceEl.addEventListener("change", () => { Store.setDivSince(sinceEl.value); App.render(); });
-    const btnLanc = root.querySelector("#btn-lanc-div");
-    if (btnLanc) btnLanc.addEventListener("click", () => abrirLancarDividendo(null));
+    // Card de dividendos (só lançamentos manuais): minimizado por padrão; abre pra ver/lançar.
+    const fmtDivDia = iso => { const p = iso.split("-"); return String(Number(p[2])) + "/" + U.MESES_ABREV[Number(p[1]) - 1].toLowerCase(); };
+    const dvToggle = root.querySelector("#dv-toggle");
+    if (dvToggle) dvToggle.addEventListener("click", () => {
+      const body = root.querySelector("#div-body");
+      const abrir = body.hidden;
+      body.hidden = !abrir;
+      dvToggle.classList.toggle("open", abrir);
+      dvToggle.setAttribute("aria-expanded", abrir);
+    });
 
     const divBody = root.querySelector("#div-body");
+    const temAuto = Object.keys(Store.inv().dividends || {}).length > 0;
+    divBody.appendChild(U.el(`
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-sm btn-primary" id="btn-lanc-div" style="color:#fff">＋ Lançar</button>
+        ${(div.linhas.length || temAuto) ? `<button class="btn-sm" id="btn-limpar-div">🧹 Limpar todos</button>` : ""}
+      </div>`));
     if (!div.linhas.length) {
-      divBody.innerHTML = `<p class="empty">Nenhum ativo na carteira. Adicione ações/FIIs para ver os dividendos.</p>`;
+      divBody.appendChild(U.el(`<p class="empty" style="margin:0">Nenhum dividendo lançado. Toque em <b>＋ Lançar</b> para registrar o que você recebeu (só conta o que você lançar aqui).</p>`));
     } else {
-      // Cabeçalho: soma total recebida no período.
-      divBody.appendChild(U.el(`
-        <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
-          <span class="${div.total > 0 ? "pos" : "muted"} num" style="font-size:22px;font-weight:700">${U.brl(div.total)}</span>
-          <span class="muted" style="font-size:12.5px">recebido desde ${mesLabel(div.since)}</span>
-        </div>`));
-      // Lista limpa: só ATIVO · nº de cotas · soma recebida.
       for (const l of div.linhas) {
-        const cls = l.total > 0 ? "pos" : "muted";
         divBody.appendChild(U.el(`
-          <div class="list-row"${l.total > 0 ? "" : ' style="opacity:.65"'}>
+          <div class="list-row">
             <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas</span></span>
-            <b class="num ${cls}">${U.brl(l.total)}</b>
+            <span style="text-align:right;white-space:nowrap">
+              <b class="num pos">${U.brl(l.total)}</b>
+              ${l.ultimoPay ? `<div class="muted" style="font-size:11px">último ${fmtDivDia(l.ultimoPay)}</div>` : ""}
+            </span>
           </div>`));
       }
     }
+    const btnLanc = divBody.querySelector("#btn-lanc-div");
+    if (btnLanc) btnLanc.addEventListener("click", () => abrirLancarDividendo(null));
+    const btnLimpar = divBody.querySelector("#btn-limpar-div");
+    if (btnLimpar) btnLimpar.addEventListener("click", () => {
+      UI.confirmar("Apagar TODOS os lançamentos de dividendos (manuais e os buscados pelo app)? O card zera e você lança de novo o que recebeu.", () => { Store.clearDividendos(); App.render(); });
+    });
 
     // Tabela de renda variável
     const rvBody = root.querySelector("#rv-body");

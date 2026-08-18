@@ -195,6 +195,13 @@ table.tbl.tbl-proj { min-width: 0; font-size: 12.5px; }
 .tbl-proj .proj-det > td { padding: 2px 5px 8px; }
 .tbl-proj .proj-det .list-row { border-bottom: 1px dashed var(--grid); }
 
+/* Dividendos (investimentos): cabeçalho minimizável (total + yield) */
+.dv-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
+.dv-head .chev { color: var(--muted); font-size: 11px; transition: transform .15s; flex: none; }
+.dv-head.open .chev { transform: rotate(90deg); }
+.dv-head-txt { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dv-body:not([hidden]) { margin-top: 10px; }
+
 /* Janela de pagamento (dashboard): cabeçalho minimizável + lista com checkbox por conta */
 .jp-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
 .jp-head .chev { color: var(--muted); font-size: 11px; transition: transform .15s; flex: none; }
