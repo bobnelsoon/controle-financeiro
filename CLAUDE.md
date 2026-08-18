@@ -221,17 +221,19 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   **"Preço médio"** (era "Preço pago"). Botão **"＋ aporte"** por ativo (`ViewInvestimentos.abrirAporte`):
   registra uma nova compra (qtd + preço desta compra) e recalcula a **média ponderada**, com prévia ao vivo
   do novo preço médio. O KPI **"Ações e FIIs"** (redundante com Patrimônio) virou **"📈 Rentabilidade"**
-  (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos recebidos"**: `state.investments.dividends`
-  (`{ticker:{list:[{value,payDate}]}}`, histórico) buscado junto com as cotações; `Store.dividendosResumo(desde)`
-  **soma todos os dividendos por cota pagos a partir de `desde`** (× cotas) + yield. `desde` = `Store.divSince()`
-  (`state.investments.divSince`, ajustável por um seletor de mês no card; padrão = início do ano). **Só
-  informativo** (não entra no fluxo). Se não houver pagamento no período, mostra o último disponível na fonte.
-  O card **💰 Dividendos recebidos** lista **TODOS os ativos da carteira** (não só os que pagaram no período):
-`Store.dividendosResumo` devolve uma linha por ativo com o total pago desde `divSince` e, para quem não
-pagou no período, o **último pagamento disponível** (`ultimoPay`/`ultimoValor`) + `source`; a UI destaca os
-que pagaram (verde) e mostra os demais esmaecidos com "último: <data>" ou "sem dados". O brapi é consultado
-**escalonado (3 por vez) com 1 nova tentativa** (`mapLimit` em `quotes.js`), para não estourar o limite do
-plano grátis (429) e trazer dado atual para todos.
+  (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos recebidos"** — **SÓ manual** (o usuário
+  lança o que recebe; a busca automática `state.investments.dividends` é **ignorada** no card, só fica como
+  reserva). `Store.dividendosResumo()` (sem args) soma **só os lançamentos manuais** por ativo, **sem filtro
+  de mês** (o total só muda ao lançar/remover; ignora `payDate` futura) + yield sobre o patrimônio em RV.
+  Lista **só os ativos com lançamento** e devolve por ativo os `lancs` (lançamentos) pro detalhe. **Cada
+  lançamento guarda `total` (recebido) + `qty` (cotas do momento)** além do `value` (por cota) — assim
+  **aportar (mudar a qtd) NÃO recalcula o histórico** (o total é fixo por lançamento; lançamentos antigos sem
+  `total` caem no `value × qty ATUAL` como aproximação). **UI**: card **minimizado** por padrão (`.dv-head`
+  com total + yield; `.dv-body` abre no toque); cada ativo **abre mês a mês** numa mini-tabela **Mês · R$/cota
+  · Cotas · Total** (`.dvi-tbl`, cotas = as do lançamento). Botões **＋ Lançar** e **🧹 Limpar todos**
+  (`Store.clearDividendos` zera manual + auto). O antigo seletor "desde <mês>" **saiu** (era o que fazia o
+  total "crescer" ao navegar). `divSince`/`setDivSince` seguem no store (sem uso). O brapi é consultado
+  **escalonado (3 por vez) com 1 nova tentativa** (`mapLimit` em `quotes.js`) — hoje só alimenta a reserva.
 No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de investimentos`, os antigos dois
   quadros `grid-2` foram fundidos): patrimônio + rentabilidade (R$ · %) no topo, **Composição** como **uma
   barra horizontal segmentada** (`.comp-bar` — fatia de cada classe, cores fixas por classe: FIIs
@@ -331,9 +333,16 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 **PUBLICADO** (linha `v19`, cache atual `202607199500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#70 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#73 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607200500`, PRs #72–#73):**
+- **Dividendos reformulados** (aba Investimentos): **só manual** (ignora a busca automática), **sem seletor de
+  mês**, card **minimizado** (total + yield) que abre pra ver/lançar; **🧹 Limpar todos**.
+- **Correção do aporte**: cada lançamento guarda o **total** + **cotas do momento** → aportar não recalcula o
+  histórico. Cada ativo **abre mês a mês** (tabela Mês · R$/cota · Cotas · Total).
+- ⚠️ Pro usuário: como a correção grava no lançamento, ele deve **Limpar todos** e **relançar** agosto.
 
 **Últimas melhorias (PUBLICADAS, cache `202607199500`, PRs #64–#70):**
 - **Fluxo Anual** abre já **rolado no mês atual**, com a 1ª coluna (Item) fixa e sem vazamento (border-collapse
