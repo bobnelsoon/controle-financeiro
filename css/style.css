@@ -201,6 +201,12 @@ table.tbl.tbl-proj { min-width: 0; font-size: 12.5px; }
 .dv-head.open .chev { transform: rotate(90deg); }
 .dv-head-txt { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .dv-body:not([hidden]) { margin-top: 10px; }
+/* Dividendos: cada ativo abre mês a mês (tabela Mês · R$/cota · Cotas · Total) */
+.dvi-row .chev { color: var(--muted); font-size: 11px; transition: transform .15s; display: inline-block; }
+.dvi-row.open .chev { transform: rotate(90deg); }
+.dvi-det { padding: 2px 2px 10px 20px; }
+table.tbl.dvi-tbl { min-width: 0; font-size: 12px; }
+.dvi-tbl th, .dvi-tbl td { padding: 5px 5px; }
 
 /* Janela de pagamento (dashboard): cabeçalho minimizável + lista com checkbox por conta */
 .jp-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }

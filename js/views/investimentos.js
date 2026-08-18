@@ -146,11 +146,14 @@ const ViewInvestimentos = (() => {
     `, (form) => {
       const ticker = form.ticker.value;
       const a = assets.find(x => x.ticker === ticker);
+      const qty = a ? a.qty : 0;
       let porCota = U.parseMoney(form.porCota.value);
-      const total = U.parseMoney(form.total.value);
-      if (porCota == null && total != null && a && a.qty) porCota = Math.round((total / a.qty) * 1e6) / 1e6;
+      let total = U.parseMoney(form.total.value);
+      if (porCota == null && total != null && qty) porCota = Math.round((total / qty) * 1e6) / 1e6;
+      if (total == null && porCota != null && qty) total = Math.round(porCota * qty * 100) / 100;
       if (porCota == null || porCota <= 0 || !form.data.value) return false;
-      Store.addDividendoManual(ticker, { value: porCota, payDate: form.data.value });
+      // Guarda o total recebido e a qtd de cotas de hoje — aportar depois não recalcula este lançamento.
+      Store.addDividendoManual(ticker, { value: porCota, total, qty, payDate: form.data.value });
       App.render();
     }, { okLabel: "Lançar" });
 
@@ -173,7 +176,9 @@ const ViewInvestimentos = (() => {
       lista.innerHTML = `<div class="muted" style="font-size:12px;margin-bottom:4px">Lançamentos de <b>${U.esc(sel.value)}</b>:</div>`;
       for (const x of man.slice().reverse()) {
         const pcTxt = "R$ " + Number(x.value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-        const row = U.el(`<div class="list-row"><span class="grow">${U.dataBR(x.payDate)} · ${pcTxt}/cota</span><button class="btn-sm btn-danger" title="Remover">✕</button></div>`);
+        const totTxt = x.total != null ? U.brl(x.total) : (x.qty != null && x.value != null ? U.brl(Math.round(x.value * x.qty * 100) / 100) : "");
+        const extra = `${x.qty != null ? ` · ${x.qty} cotas` : ""}${totTxt ? ` · <b class="pos">${totTxt}</b>` : ""}`;
+        const row = U.el(`<div class="list-row"><span class="grow" style="font-size:12.5px">${U.dataBR(x.payDate)} · ${pcTxt}/cota${extra}</span><button class="btn-sm btn-danger" title="Remover">✕</button></div>`);
         row.querySelector("button").addEventListener("click", () => { Store.removeDividendoManual(sel.value, x.id); renderLista(); App.render(); });
         lista.appendChild(row);
       }
@@ -376,7 +381,9 @@ const ViewInvestimentos = (() => {
     root.querySelector("#btn-rf").addEventListener("click", () => abrirRendaFixa(null));
 
     // Card de dividendos (só lançamentos manuais): minimizado por padrão; abre pra ver/lançar.
-    const fmtDivDia = iso => { const p = iso.split("-"); return String(Number(p[2])) + "/" + U.MESES_ABREV[Number(p[1]) - 1].toLowerCase(); };
+    const mesAno = iso => { const p = iso.split("-"); return U.MESES_ABREV[Number(p[1]) - 1].toLowerCase() + "/" + p[0].slice(2); };
+    const cotaTxt = v => v != null ? Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : "—";
+    const valTxt = v => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const dvToggle = root.querySelector("#dv-toggle");
     if (dvToggle) dvToggle.addEventListener("click", () => {
       const body = root.querySelector("#div-body");
@@ -396,15 +403,34 @@ const ViewInvestimentos = (() => {
     if (!div.linhas.length) {
       divBody.appendChild(U.el(`<p class="empty" style="margin:0">Nenhum dividendo lançado. Toque em <b>＋ Lançar</b> para registrar o que você recebeu (só conta o que você lançar aqui).</p>`));
     } else {
+      // Cada ativo abre mês a mês: Mês · R$/cota · Cotas · Total (cotas = as do momento do lançamento).
       for (const l of div.linhas) {
-        divBody.appendChild(U.el(`
-          <div class="list-row">
-            <span class="grow"><b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas</span></span>
-            <span style="text-align:right;white-space:nowrap">
-              <b class="num pos">${U.brl(l.total)}</b>
-              ${l.ultimoPay ? `<div class="muted" style="font-size:11px">último ${fmtDivDia(l.ultimoPay)}</div>` : ""}
-            </span>
-          </div>`));
+        const asset = U.el(`<div class="dvi-asset"></div>`);
+        const row = U.el(`
+          <div class="list-row dvi-row" style="cursor:pointer">
+            <span class="grow"><span class="chev">▸</span> <b>${U.esc(l.ticker)}</b> <span class="muted" style="font-size:11.5px">· ${l.qty} cotas</span></span>
+            <b class="num pos">${U.brl(l.total)}</b>
+          </div>`);
+        const det = U.el(`<div class="dvi-det" hidden></div>`);
+        const tbl = U.el(`
+          <table class="tbl dvi-tbl">
+            <thead><tr><th>Mês</th><th class="num">R$/cota</th><th class="num">Cotas</th><th class="num">Total</th></tr></thead>
+            <tbody></tbody>
+          </table>`);
+        const tb = tbl.querySelector("tbody");
+        for (const x of l.lancs) {
+          tb.appendChild(U.el(`<tr>
+            <td>${mesAno(x.payDate)}</td>
+            <td class="num">${cotaTxt(x.value)}</td>
+            <td class="num">${x.qty != null ? x.qty : "—"}</td>
+            <td class="num pos">${valTxt(x.total)}</td>
+          </tr>`));
+        }
+        det.appendChild(tbl);
+        row.addEventListener("click", () => { const abrir = det.hidden; det.hidden = !abrir; row.classList.toggle("open", abrir); });
+        asset.appendChild(row);
+        asset.appendChild(det);
+        divBody.appendChild(asset);
       }
     }
     const btnLanc = divBody.querySelector("#btn-lanc-div");
