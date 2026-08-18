@@ -717,6 +717,12 @@ const Store = (() => {
       save();
     }
   }
+  // Zera TODOS os dividendos (manuais + os buscados automaticamente) — começar do zero.
+  function clearDividendos() {
+    inv().dividends = {};
+    inv().dividendsManual = {};
+    save();
+  }
 
   // Token da API brapi.dev (cotações + dividendos). NÃO é travado por domínio — é uma credencial
   // pessoal da conta do usuário, então NÃO fica no código público: vive nos dados (settings), que
@@ -725,53 +731,36 @@ const Store = (() => {
   function brapiToken() { return (state.settings && state.settings.brapiToken) || ""; }
   function setBrapiToken(t) { state.settings.brapiToken = (t || "").trim() || null; save(); }
 
-  // Resumo dos dividendos: devolve UMA linha por ativo da carteira (todos, não só os que pagaram
-  // no período), com a SOMA por cota paga a partir de `desde` (× cotas). Para os que não pagaram
-  // no período, guarda o ÚLTIMO pagamento disponível na fonte (data + valor) como dica. Também o
-  // total da carteira e o yield sobre o patrimônio em RV.
-  function dividendosResumo(desde) {
-    const divs = inv().dividends || {};
+  // Resumo dos dividendos: SÓ os lançamentos MANUAIS do usuário (a fonte de verdade). Soma tudo que
+  // ele lançou por ativo (por cota × cotas), sem filtro de mês — o total só muda quando ele lança ou
+  // remove algo. Lista só os ativos que têm lançamento. Guarda a data do último pagamento por ativo.
+  // Ignora datas futuras. Também o total geral e o yield sobre o patrimônio em ações/FIIs.
+  function dividendosResumo() {
     const man = inv().dividendsManual || {};
-    const since = desde || divSince();
     const hoje = U.hojeISO();
     const linhas = [];
-    let total = 0;
-    let ultimoDisponivel = null;
+    let total = 0, ultimoDisponivel = null;
     for (const a of inv().assets) {
-      // O que o usuário lançou à mão tem prioridade sobre a busca automática (fonte de verdade).
-      const manual = man[a.ticker] && man[a.ticker].length ? man[a.ticker] : null;
-      const d = manual ? null : divs[a.ticker];
-      const list = manual ? manual : (d ? (d.list || (d.value != null ? [{ value: d.value, payDate: d.payDate }] : [])) : []);
-      const src = manual ? "manual" : (d ? d.source : null);
-      let ultimoPay = null, ultimoValor = null;
+      const list = man[a.ticker] || [];
+      if (!list.length) continue; // só ativos com lançamento manual
+      let ultimoPay = null, perCota = 0, n = 0;
       for (const x of list) {
-        if (!x.payDate) continue;
-        // "último pago" considera só o que já foi pago (payDate <= hoje) — evita anúncios futuros.
-        if (x.payDate <= hoje && (!ultimoPay || x.payDate > ultimoPay)) { ultimoPay = x.payDate; ultimoValor = x.value; }
+        if (x.value == null || !x.payDate || x.payDate > hoje) continue; // ignora provento com data futura
+        perCota += x.value; n++;
+        if (!ultimoPay || x.payDate > ultimoPay) ultimoPay = x.payDate;
         if (!ultimoDisponivel || x.payDate > ultimoDisponivel) ultimoDisponivel = x.payDate;
       }
-      // Recebido = pago no período E já pago (não conta provento anunciado com data futura).
-      const itens = list.filter(x => x.value != null && x.payDate && x.payDate.slice(0, 7) >= since && x.payDate <= hoje);
-      const perCota = Math.round(itens.reduce((s, x) => s + x.value, 0) * 1e6) / 1e6;
+      if (n === 0) continue;
+      perCota = Math.round(perCota * 1e6) / 1e6;
       const t = Math.round(perCota * a.qty * 100) / 100;
       total += t;
-      linhas.push({
-        ticker: a.ticker, type: a.type, qty: a.qty,
-        perCota, total: t, n: itens.length,
-        temDados: list.length > 0, temNoPeriodo: itens.length > 0,
-        manual: !!manual, ultimoPay, ultimoValor, source: src
-      });
+      linhas.push({ ticker: a.ticker, type: a.type, qty: a.qty, perCota, total: t, n, ultimoPay });
     }
     total = Math.round(total * 100) / 100;
     const patr = rvTotal();
     const yieldPct = patr > 0 ? (total / patr) * 100 : null;
-    // Ordena: quem pagou no período primeiro (maior total), depois quem tem dados mas 0, por fim sem dados.
-    linhas.sort((a, b) => {
-      if (b.total !== a.total) return b.total - a.total;
-      if (a.temDados !== b.temDados) return a.temDados ? -1 : 1;
-      return a.ticker < b.ticker ? -1 : 1;
-    });
-    return { linhas, total, yieldPct, since, ultimoDisponivel };
+    linhas.sort((a, b) => b.total - a.total || (a.ticker < b.ticker ? -1 : 1));
+    return { linhas, total, yieldPct, ultimoDisponivel };
   }
 
   // Aportes do ano: soma do item de fluxo cujo nome contém "invest" (valores negativos = dinheiro aplicado)
@@ -1012,7 +1001,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes, janelaPagamento,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
+    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
