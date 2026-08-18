@@ -133,43 +133,57 @@ const ViewInvestimentos = (() => {
     const assets = Store.inv().assets;
     if (!assets.length) { UI.modal("Lançar dividendo", `<p class="empty">Você ainda não tem ativos na carteira.</p>`, () => true); return; }
     const opts = assets.map(a => `<option value="${U.esc(a.ticker)}" ${a.ticker === tickerInicial ? "selected" : ""}>${U.esc(a.ticker)} (${a.qty} cotas)</option>`).join("");
+    const aIni = assets.find(a => a.ticker === tickerInicial) || assets[0];
+    const qtyIni = aIni ? aIni.qty : 0;
     const ov = UI.modal("Lançar dividendo recebido", `
       <label class="fld"><span>Ativo</span><select name="ticker">${opts}</select></label>
-      <label class="fld"><span>Data do pagamento</span><input type="date" name="data" value="${U.hojeISO()}" max="${U.hojeISO()}"></label>
+      <div class="fld-2">
+        <label class="fld"><span>Data do pagamento</span><input type="date" name="data" value="${U.hojeISO()}" max="${U.hojeISO()}"></label>
+        <label class="fld"><span>Cotas nesta data</span><input type="number" name="cotas" min="0" step="1" value="${qtyIni}"></label>
+      </div>
       <div class="fld-2">
         <label class="fld"><span>Valor por cota (R$)</span><input type="text" name="porCota" inputmode="decimal" placeholder="ex.: 0,10"></label>
         <label class="fld"><span>Total recebido (R$)</span><input type="text" name="total" inputmode="decimal" placeholder="ex.: 7,50"></label>
       </div>
       <div id="ld-prev" class="muted" style="font-size:12.5px"></div>
-      <p class="muted" style="font-size:12px">Preencha <b>um</b> dos dois — o outro é calculado pela quantidade de cotas. O que você lança aqui vale como fonte oficial daquele ativo (não é sobrescrito ao atualizar cotações).</p>
+      <p class="muted" style="font-size:12px"><b>Cotas nesta data</b> = quantas cotas você tinha quando o provento foi apurado (ex.: se o pagamento de agosto é referente a julho, use as cotas de julho). Preencha <b>um</b> dos valores — o outro é calculado por essas cotas. Não é sobrescrito ao atualizar cotações.</p>
       <div id="ld-lista" class="mt"></div>
     `, (form) => {
       const ticker = form.ticker.value;
-      const a = assets.find(x => x.ticker === ticker);
-      const qty = a ? a.qty : 0;
+      const cotas = Number(form.cotas.value) || 0;
       let porCota = U.parseMoney(form.porCota.value);
       let total = U.parseMoney(form.total.value);
-      if (porCota == null && total != null && qty) porCota = Math.round((total / qty) * 1e6) / 1e6;
-      if (total == null && porCota != null && qty) total = Math.round(porCota * qty * 100) / 100;
-      if (porCota == null || porCota <= 0 || !form.data.value) return false;
-      // Guarda o total recebido e a qtd de cotas de hoje — aportar depois não recalcula este lançamento.
-      Store.addDividendoManual(ticker, { value: porCota, total, qty, payDate: form.data.value });
+      if (porCota == null && total != null && cotas) porCota = Math.round((total / cotas) * 1e6) / 1e6;
+      if (total == null && porCota != null && cotas) total = Math.round(porCota * cotas * 100) / 100;
+      if (porCota == null || porCota <= 0 || !form.data.value || cotas <= 0) return false;
+      // Guarda o total e as cotas DA DATA do provento — aportar depois não recalcula este lançamento.
+      Store.addDividendoManual(ticker, { value: porCota, total, qty: cotas, payDate: form.data.value });
       App.render();
     }, { okLabel: "Lançar" });
 
     const sel = ov.querySelector('select[name="ticker"]');
+    const cotasEl = ov.querySelector('input[name="cotas"]');
     const pc = ov.querySelector('input[name="porCota"]');
     const tot = ov.querySelector('input[name="total"]');
     const prev = ov.querySelector("#ld-prev");
     const lista = ov.querySelector("#ld-lista");
-    const qtdSel = () => { const a = assets.find(x => x.ticker === sel.value); return a ? a.qty : 0; };
+    const qtdSel = () => Number(cotasEl.value) || 0;
     function calcPrev() {
       const v = U.parseMoney(pc.value);
       prev.innerHTML = (v != null && qtdSel()) ? `= <b class="pos">${U.brl(Math.round(v * qtdSel() * 100) / 100)}</b> <span class="muted">(${qtdSel()} cotas × ${U.brl(v)}/cota)</span>` : "";
     }
+    // Recalcula mantendo o "por cota" como taxa; se só o total estiver preenchido, deriva o por cota.
+    function recalc() {
+      const q = qtdSel(); if (!q) { calcPrev(); return; }
+      const vpc = U.parseMoney(pc.value), vt = U.parseMoney(tot.value);
+      if (vpc != null) tot.value = String(Math.round(vpc * q * 100) / 100).replace(".", ",");
+      else if (vt != null) pc.value = String(Math.round((vt / q) * 1e6) / 1e6).replace(".", ",");
+      calcPrev();
+    }
     pc.addEventListener("input", () => { const v = U.parseMoney(pc.value); if (v != null && qtdSel()) tot.value = String(Math.round(v * qtdSel() * 100) / 100).replace(".", ","); calcPrev(); });
     tot.addEventListener("input", () => { const v = U.parseMoney(tot.value); if (v != null && qtdSel()) pc.value = String(Math.round((v / qtdSel()) * 1e6) / 1e6).replace(".", ","); calcPrev(); });
-    sel.addEventListener("change", () => { renderLista(); calcPrev(); });
+    cotasEl.addEventListener("input", recalc);
+    sel.addEventListener("change", () => { const a = assets.find(x => x.ticker === sel.value); cotasEl.value = a ? a.qty : 0; renderLista(); recalc(); });
     function renderLista() {
       const man = (Store.inv().dividendsManual || {})[sel.value] || [];
       if (!man.length) { lista.innerHTML = `<p class="muted" style="font-size:12px">Nenhum lançamento manual para ${U.esc(sel.value)} ainda.</p>`; return; }
