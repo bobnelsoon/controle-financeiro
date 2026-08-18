@@ -301,6 +301,11 @@ const ViewInvestimentos = (() => {
     const aportes = Store.aportesDoAno(ano);
     const rent = Store.carteiraRentabilidade();
     const div = Store.dividendosResumo();
+    // Ações & FIIs: agrupa por tipo (FIIs / Ações) com subtotal. valor atual do ativo = cotação × cotas.
+    const valAtivo = a => { const q = inv.quotes[a.ticker]; return q ? q.price * a.qty : 0; };
+    let subFii = 0, subAcao = 0;
+    for (const a of inv.assets) { if (a.type === "fii") subFii += valAtivo(a); else subAcao += valAtivo(a); }
+    subFii = Math.round(subFii * 100) / 100; subAcao = Math.round(subAcao * 100) / 100;
 
     const qs = Object.values(inv.quotes);
     const ultimaAtt = qs.length ? Math.max(...qs.map(q => q.updatedAt || 0)) : null;
@@ -354,17 +359,24 @@ const ViewInvestimentos = (() => {
       </div>
 
       <div class="card mb">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <h2 class="section" style="margin:0">Ações & FIIs</h2>
-          <div class="row-gap">
+        <button type="button" class="dv-head" id="inv-toggle" aria-expanded="false">
+          <span class="chev">▸</span>
+          <span class="dv-head-txt">
+            <span style="font-weight:600;font-size:15px">📊 Ações & FIIs</span>
+            <span class="muted" style="font-size:11.5px">🏢 FIIs ${U.brl(subFii)} · 📈 Ações ${U.brl(subAcao)}</span>
+          </span>
+          <b class="num" style="font-size:16px;white-space:nowrap">${U.brl(subFii + subAcao)}</b>
+        </button>
+        <div id="rv-wrap" class="dv-body" hidden>
+          <div class="row-gap" style="justify-content:flex-end;margin-bottom:8px">
             <button class="btn-sm" id="btn-imp-inv">📥 Importar</button>
             <button class="btn-sm" id="btn-ativo">+ Ativo</button>
           </div>
+          <table class="tbl tbl-wide">
+            <thead><tr><th>Ticker</th><th class="num">Cotas</th><th class="num">Preço médio</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody id="rv-body"></tbody>
+          </table>
         </div>
-        <table class="tbl tbl-wide mt">
-          <thead><tr><th>Ticker</th><th>Tipo</th><th class="num">Cotas</th><th class="num">Preço médio</th><th class="num">Preço atual</th><th class="num">Hoje</th><th class="num">Ganho/Perda</th><th class="num">Total</th><th></th></tr></thead>
-          <tbody id="rv-body"></tbody>
-        </table>
       </div>
 
       <div class="card mb">
@@ -453,9 +465,18 @@ const ViewInvestimentos = (() => {
       UI.confirmar("Apagar TODOS os lançamentos de dividendos (manuais e os buscados pelo app)? O card zera e você lança de novo o que recebeu.", () => { Store.clearDividendos(); App.render(); });
     });
 
-    // Tabela de renda variável
+    // Ações & FIIs: card minimizável (cabeçalho abre/fecha a tabela).
+    const invToggle = root.querySelector("#inv-toggle");
+    if (invToggle) invToggle.addEventListener("click", () => {
+      const w = root.querySelector("#rv-wrap");
+      const abrir = w.hidden; w.hidden = !abrir;
+      invToggle.classList.toggle("open", abrir);
+      invToggle.setAttribute("aria-expanded", abrir);
+    });
+
+    // Tabela de renda variável — agrupada por tipo (FIIs / Ações) com subtotal, sem coluna Tipo.
     const rvBody = root.querySelector("#rv-body");
-    for (const a of inv.assets) {
+    function assetRow(a) {
       const q = inv.quotes[a.ticker];
       const totalAtivo = q ? q.price * a.qty : null;
       let varDia = "—", varCls = "muted";
@@ -464,7 +485,6 @@ const ViewInvestimentos = (() => {
         varDia = (pct >= 0 ? "+" : "") + pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
         varCls = pct > 0 ? "pos" : pct < 0 ? "neg" : "muted";
       }
-      // Ganho/perda em relação ao preço médio pago
       let ganhoTxt = "—", ganhoCls = "muted";
       if (q && a.avgPrice != null && a.avgPrice > 0) {
         const ganho = (q.price - a.avgPrice) * a.qty;
@@ -475,7 +495,6 @@ const ViewInvestimentos = (() => {
       const tr = U.el(`
         <tr>
           <td><b>${U.esc(a.ticker)}</b>${q && q.name ? `<div class="muted" style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(q.name)}</div>` : ""}</td>
-          <td><span class="tag">${TIPO_LABEL[a.type] || a.type}</span></td>
           <td class="num">${a.qty}</td>
           <td class="num">${a.avgPrice != null ? U.brl(a.avgPrice) : "—"}</td>
           <td class="num">${q ? U.brl(q.price) : "—"}</td>
@@ -497,9 +516,18 @@ const ViewInvestimentos = (() => {
           App.render();
         });
       });
-      rvBody.appendChild(tr);
+      return tr;
     }
-    if (!inv.assets.length) rvBody.innerHTML = `<tr><td colspan="9" class="empty">Nenhum ativo. Clique em "+ Ativo".</td></tr>`;
+    const sortTot = (x, y) => valAtivo(y) - valAtivo(x) || (x.ticker < y.ticker ? -1 : 1);
+    const fiisArr = inv.assets.filter(a => a.type === "fii").sort(sortTot);
+    const acoesArr = inv.assets.filter(a => a.type !== "fii").sort(sortTot);
+    function grupoInv(nome, arr, sub) {
+      rvBody.appendChild(U.el(`<tr class="grupo-inv"><td colspan="6"><b>${nome}</b> <span class="muted" style="font-weight:400;font-size:11px">· ${arr.length}</span></td><td class="num"><b>${U.brl(sub)}</b></td><td></td></tr>`));
+      for (const a of arr) rvBody.appendChild(assetRow(a));
+    }
+    if (fiisArr.length) grupoInv("🏢 FIIs", fiisArr, subFii);
+    if (acoesArr.length) grupoInv("📈 Ações", acoesArr, subAcao);
+    if (!inv.assets.length) rvBody.innerHTML = `<tr><td colspan="8" class="empty">Nenhum ativo. Clique em "+ Ativo".</td></tr>`;
 
     // Renda fixa
     const rfList = root.querySelector("#rf-list");

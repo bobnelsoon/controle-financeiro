@@ -207,6 +207,8 @@ table.tbl.tbl-proj { min-width: 0; font-size: 12.5px; }
 .dvi-det { padding: 2px 2px 10px 20px; }
 table.tbl.dvi-tbl { min-width: 0; font-size: 12px; }
 .dvi-tbl th, .dvi-tbl td { padding: 5px 5px; }
+/* Ações & FIIs: linha de grupo (FIIs / Ações) com subtotal */
+.tbl tr.grupo-inv td { background: var(--page); font-weight: 700; padding-top: 11px; border-top: 1px solid var(--border); }
 
 /* Janela de pagamento (dashboard): cabeçalho minimizável + lista com checkbox por conta */
 .jp-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
