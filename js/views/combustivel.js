@@ -362,7 +362,7 @@ const ViewCombustivel = (() => {
         </div>
         <div class="card">
           <b style="font-size:15px">Gasto por mês</b>
-          <div class="muted" style="font-size:12px;margin:2px 0 8px">combustível (pedágio à parte)</div>
+          <div class="hbar-leg"><span><i class="i-comb"></i>combustível</span><span><i class="i-toll"></i>pedágio</span></div>
           <div id="comb-mes-chart"></div>
         </div>
       </div>
@@ -387,8 +387,23 @@ const ViewCombustivel = (() => {
     if (!meses.length) {
       chartEl.innerHTML = `<p class="empty">Sem dados ainda.</p>`;
     } else {
-      const rows = meses.slice(-6).map(x => ({ label: U.MESES_ABREV[U.ymParse(x.ym).m - 1], value: Math.round(x.comb) }));
-      if (prev.combPrev != null) rows.push({ label: U.MESES_ABREV[mesProx.m - 1] + " (prev.)", value: Math.round(prev.combPrev) });
+      // Cada barra = combustível + pedágio (empilhados), pra bater com a Previsão (total).
+      const rows = meses.slice(-6).map(x => {
+        const comb = Math.round(x.comb), toll = Math.round(x.toll);
+        return {
+          label: U.MESES_ABREV[U.ymParse(x.ym).m - 1], value: comb + toll,
+          segments: [{ value: comb, cls: "seg-comb" }, { value: toll, cls: "seg-toll" }],
+          title: `${U.MESES_ABREV[U.ymParse(x.ym).m - 1]}: ${U.brl(comb + toll)} (⛽ ${U.brl(comb)} · 🛣️ ${U.brl(toll)})`
+        };
+      });
+      if (prev.combPrev != null) {
+        const comb = Math.round(prev.combPrev), toll = Math.round(prev.tollPrev || 0);
+        rows.push({
+          label: U.MESES_ABREV[mesProx.m - 1] + " (prev.)", value: comb + toll,
+          segments: [{ value: comb, cls: "seg-comb" }, { value: toll, cls: "seg-toll" }],
+          title: `${U.MESES_ABREV[mesProx.m - 1]} (prev.): ${U.brl(comb + toll)} (⛽ ${U.brl(comb)} · 🛣️ ${U.brl(toll)})`
+        });
+      }
       Charts.barsH(chartEl, rows);
     }
 
