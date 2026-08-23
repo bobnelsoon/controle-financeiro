@@ -299,6 +299,7 @@ button:hover { border-color: var(--accent); }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-sm { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+.btn-sm.ped.on { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
 .btn-pay { border-color: var(--chip-pago); color: var(--chip-pago-ink); font-weight: 600; }
 .btn-danger { color: var(--critical); }
 
