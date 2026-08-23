@@ -159,11 +159,20 @@ const Charts = (() => {
     const max = Math.max(...rows.map(r => r.value));
     const wrap = U.el(`<div class="hbars"></div>`);
     for (const r of rows) {
-      const pct = max ? (r.value / max) * 100 : 0;
+      // Barra simples ou empilhada (r.segments = [{value, cls}] — ex.: combustível + pedágio).
+      let fill;
+      if (r.segments && r.segments.length) {
+        fill = r.segments
+          .filter(seg => seg.value > 0)
+          .map(seg => `<span class="hbar-fill ${seg.cls || ""}" style="width:${max ? (seg.value / max) * 100 : 0}%"></span>`)
+          .join("");
+      } else {
+        fill = `<span class="hbar-fill" style="width:${max ? (r.value / max) * 100 : 0}%"></span>`;
+      }
       wrap.appendChild(U.el(`
-        <div class="hbar-row" title="${U.esc(r.label)}: ${U.brl(r.value)}">
+        <div class="hbar-row" title="${U.esc(r.title || (r.label + ": " + U.brl(r.value)))}">
           <span class="hbar-label">${U.esc(r.label)}</span>
-          <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%"></span></span>
+          <span class="hbar-track">${fill}</span>
           <span class="hbar-value">${U.brl(r.value)}</span>
         </div>`));
     }

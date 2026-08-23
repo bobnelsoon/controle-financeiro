@@ -251,9 +251,12 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
   **Consumo (km/l) = tanque cheio → tanque cheio** (`Store.fuelEntriesComputed`): acumula os litros desde o
   último tanque cheio (somando parciais) e no próximo cheio faz `kmL = (odo − odoÚltimoCheio) / litrosDoIntervalo`;
   não calcula em intervalos que **misturam combustíveis** (ex.: transição gasolina→álcool) nem em parciais.
-  `custoKm = pagoNoIntervalo / dist`. **Pedágio é separado** (informativo): NÃO entra no gasto de combustível
-  nos KPIs; `fuelStats` devolve `tollMes`/`tollTotal` à parte. `Store.fuelStats(ym)` dá consumo médio/último
-  (blended entre combustíveis), custo/km, gasto do mês (só combustível), preço médio do litro, km do mês, pedágio.
+  `custoKm = pagoNoIntervalo / dist`. **Pedágio fica separado nos KPIs de CONSUMO** (consumo médio, custo/km,
+  preço médio do litro, "Gasto do mês" — todos só combustível, pra não distorcer os R$/litro e R$/km);
+  `fuelStats` devolve `tollMes`/`tollTotal` à parte. **Mas nos totais de GASTO o pedágio soma**: o card
+  **Previsão** e o gráfico **Gasto por mês** mostram **combustível + pedágio** (o gráfico empilha as duas
+  cores — ver Dashboard). `Store.fuelStats(ym)` dá consumo médio/último (blended entre combustíveis),
+  custo/km, gasto do mês (só combustível), preço médio do litro, km do mês, pedágio.
   Aba **Resumo** (`ViewCombustivel`) = KPIs + últimos abastecimentos; aba **Abastecimentos** (`ViewAbastecimentos`)
   = lista completa (com local/obs/pedágio) + **📥 Importar** (`ViewCombustivel.abrirImportar`): aceita uma
   **lista** de abastecimentos (`date, km, fuel, local, liters, price, paid, toll, obs`) **ou** um **objeto
@@ -274,7 +277,10 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
   - **Dashboard (1ª aba)**: além dos KPIs, tem o card **Previsão para <próximo mês>** (`Store.fuelPrevisaoProxMes`:
     combustível = ritmo km/dia ÷ consumo médio × preço recente do litro; pedágio = média dos meses fechados,
     descartando o 1º se for parcial) e o gráfico **Gasto por mês** (`Store.fuelGastoPorMes` via `Charts.barsH`,
-    com a barra da previsão).
+    com a barra da previsão). **Cada barra é EMPILHADA = combustível + pedágio** (bate com o total da
+    Previsão): `barsH` aceita `r.segments = [{value, cls}]` (`seg-comb` azul `var(--accent)` · `seg-toll`
+    laranja `var(--warning)`) e `r.title` (tooltip com o detalhe ⛽/🛣️); o card tem uma legenda `.hbar-leg`.
+    Mês sem pedágio mostra só a barra de combustível. Os KPIs de consumo seguem só-combustível (acima).
   - **Pagamento no cartão** (integração com o Financeiro): o form de abastecimento tem **Forma de pagamento**
     (— não lançar — / 💳 Cartão). No cartão, cria um `cardTx` (fatura = mês do abastecimento **+ 1**) e vincula
     por `entry.linkCardTxId` (+ `payment: "cartao"`, `cardId`). **Editar** o abastecimento remove o `cardTx`
@@ -343,11 +349,17 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607204500`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607205000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#82 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#83 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607205000`, PR #83):**
+- **Gasto por mês (Combustível) agora inclui pedágio**: o gráfico virou barra **empilhada** combustível +
+  pedágio (azul + laranja, com legenda), batendo com o total da **Previsão**. Os KPIs de consumo (consumo
+  médio, custo/km, preço do litro, "Gasto do mês") seguem **só combustível** (pra não distorcer R$/litro e
+  R$/km). `Charts.barsH` ganhou `r.segments`/`r.title` (empilhado + tooltip com o detalhe ⛽/🛣️).
 
 **Últimas melhorias (PUBLICADAS, cache `202607204500`, PRs #81–#82):**
 - **Pedágio travado no atalho**: o atalho **Adicionar → 🛣️ Pedágio** trava no cartão **Itaú** + valor
