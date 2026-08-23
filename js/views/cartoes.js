@@ -188,15 +188,32 @@ const ViewCartoes = (() => {
         </div>`);
 
       const tbody = card.querySelector("tbody");
+      const tollDe = (txId) => ((Store.state.fuel && Store.state.fuel.entries) || []).find(e => e.linkCardTxId === txId && e.liters == null);
       for (const t of txs) {
+        const ehPed = !!tollDe(t.id);
         const tr = U.el(`
           <tr>
             <td>${t.date ? U.dataBR(t.date) : "—"}</td>
-            <td>${U.esc(t.desc)}</td>
+            <td>${U.esc(t.desc)}${ehPed ? ' <span title="Sincronizado como pedágio no Combustível">🛣️</span>' : ""}</td>
             <td class="num ${t.value < 0 ? "pos" : ""}">${U.brl(t.value)}</td>
-            <td><button class="btn-sm btn-danger" title="Excluir">✕</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn-sm ped ${ehPed ? "on" : ""}" title="${ehPed ? "É pedágio — clique para tirar do Combustível" : "Marcar como pedágio (adiciona ao Combustível)"}">🛣️</button>
+              <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
+            </td>
           </tr>`);
-        tr.querySelector("button").addEventListener("click", () => {
+        tr.querySelector(".ped").addEventListener("click", () => {
+          const fe = tollDe(t.id);
+          if (fe) { Store.removeFuel(fe.id); }
+          else {
+            Store.addFuel({
+              date: t.date || U.hojeISO(), odometer: null, liters: null, pricePerLiter: null, total: null, fuelType: null,
+              local: t.desc, toll: Math.abs(t.value), obs: "Recarga de pedágio (cartão)",
+              full: false, payment: "cartao", cardId: t.accountId, linkCardTxId: t.id
+            });
+          }
+          App.render();
+        });
+        tr.querySelector(".rm").addEventListener("click", () => {
           const parcelas = Store.cardTxParcelas(t);
           if (parcelas.length > 1) {
             const n = parcelas.length;
