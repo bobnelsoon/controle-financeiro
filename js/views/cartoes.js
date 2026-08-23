@@ -60,17 +60,23 @@ const ViewCartoes = (() => {
         <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
       </div>
       <label class="fld"><span>Fatura de</span><input type="month" name="fatura" value="${faturaInicial}"></label>
+      <label class="fld fld-check"><input type="checkbox" name="pedagio" id="compra-pedagio"><span>🛣️ É recarga de pedágio <span class="muted" style="font-weight:400;font-size:11px">(conta no Combustível)</span></span></label>
       <p class="muted" style="font-size:12px" id="compra-nota-fatura">A fatura é escolhida automaticamente pelo <b>dia de fechamento</b> do cartão (dá pra ajustar). Parcelas caem nas faturas seguintes; o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho.</p>
+      <p class="muted" style="font-size:12px;display:none" id="compra-nota-pedagio">🛣️ Além da fatura, cria um registro de <b>pedágio</b> no Combustível (aba Abastecimentos, "só pedágio" 💳) — entra no pedágio do mês/total e na previsão. É à vista (sem parcelas). Excluir a compra tira o pedágio de lá também.</p>
     `, (form) => {
       const total = U.parseMoney(form.valor.value);
       if (total == null || !form.desc.value.trim()) return false;
-      const n = Math.max(1, Number(form.parcelas.value) || 1);
+      const ehPedagio = form.pedagio && form.pedagio.checked;
+      const n = ehPedagio ? 1 : Math.max(1, Number(form.parcelas.value) || 1); // recarga de pedágio é à vista
       const vParc = Math.round((Math.abs(total) / n) * 100) / 100;
       const base = form.fatura.value || mesSel;
       const groupId = n > 1 ? U.id() : null; // liga as parcelas para excluir todas de uma vez
+      let primeiroTxId = null;
       for (let i = 0; i < n; i++) {
+        const txId = U.id();
+        if (i === 0) primeiroTxId = txId;
         const tx = {
-          id: U.id(),
+          id: txId,
           ym: U.ymAdd(base, i),
           accountId: form.conta.value,
           desc: form.desc.value.trim() + (n > 1 ? ` ${String(i + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}` : ""),
@@ -80,7 +86,25 @@ const ViewCartoes = (() => {
         if (groupId) tx.groupId = groupId;
         Store.addCardTx(tx);
       }
+      // Recarga de pedágio: cria um registro "só pedágio" no Combustível, vinculado à compra do cartão.
+      if (ehPedagio) {
+        Store.addFuel({
+          date: form.data.value || U.hojeISO(),
+          odometer: null, liters: null, pricePerLiter: null, total: null, fuelType: null,
+          local: form.desc.value.trim(), toll: Math.abs(total), obs: "Recarga de pedágio (cartão)",
+          full: false, payment: "cartao", cardId: form.conta.value, linkCardTxId: primeiroTxId
+        });
+      }
       App.render();
+    });
+
+    // Ao marcar "é pedágio": esconde parcelas (é à vista) e mostra a nota do pedágio.
+    const pedagioEl = ov.querySelector('#compra-pedagio');
+    if (pedagioEl) pedagioEl.addEventListener("change", () => {
+      const on = pedagioEl.checked;
+      const parcLabel = ov.querySelector('input[name="parcelas"]').closest("label");
+      if (parcLabel) parcLabel.style.display = on ? "none" : "";
+      ov.querySelector('#compra-nota-pedagio').style.display = on ? "" : "none";
     });
 
     // A "Fatura de" segue o dia de fechamento do cartão escolhido e a data da compra,
