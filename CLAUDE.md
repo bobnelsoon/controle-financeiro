@@ -292,13 +292,14 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
   - **Pedágio pago no cartão → conta no Combustível**: a recarga de pedágio no cartão vira um registro
     **"só pedágio"** no Combustível (`liters` null, `toll` = valor, vinculado por `entry.linkCardTxId` +
     `payment:"cartao"`, `cardId`), então entra no `tollMes`/`tollTotal`/previsão e aparece na aba
-    Abastecimentos (💳). **Como criar**: (1) o form de **Compra no cartão** tem o checkbox **"🛣️ É recarga de
-    pedágio"** (à vista, esconde parcelas) e (2) o menu **Adicionar → 🛣️ Pedágio** (`abrirNovaCompra(null,
-    {pedagio:true})`) já abre no **cartão de pedágio** (`ultimoCartaoPedagio` = cartão do último registro
-    só-pedágio) com desc "Pedágio", valor **100,00** e o checkbox marcado. **Excluir** a compra remove o
-    registro de pedágio (`removeCardTx` limpa o toll-only vinculado; abastecimentos com litros não são
-    afetados). Na lista de Cartões, compras assim mostram um **indicador 🛣️** (o botão de marcar/desmarcar
-    na fatura foi removido — usa-se o atalho/checkbox).
+    Abastecimentos (💳). **Como criar**: **só** pelo menu **Adicionar → 🛣️ Pedágio**
+    (`abrirNovaCompra(null, {pedagio:true})`) — abre no **cartão de pedágio** (`ultimoCartaoPedagio` = cartão
+    do último registro só-pedágio; hoje só Itaú) com desc "Pedágio", valor **100,00** e parcelas escondidas
+    (à vista). ⚠️ **Não há mais checkbox "É recarga de pedágio" no form de Compra normal** (era redundante com
+    o atalho e confundia): o pedágio é 100% guiado por `opts.pedagio` (o submit usa `pedagioIni`, não um campo
+    do form). **Excluir** a compra remove o registro de pedágio (`removeCardTx` limpa o toll-only vinculado;
+    abastecimentos com litros não são afetados). Na lista de Cartões, compras assim mostram um **indicador
+    🛣️** (o botão de marcar/desmarcar na fatura também foi removido — usa-se o atalho).
 
 ## Convenções de UI
 
@@ -342,11 +343,20 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607203500`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607204500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#80 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#82 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607204500`, PRs #81–#82):**
+- **Pedágio travado no atalho**: o atalho **Adicionar → 🛣️ Pedágio** trava no cartão **Itaú** + valor
+  **100,00** (recarga fixa, só há Itaú com pedágio). O **checkbox "É recarga de pedágio" saiu do form de
+  Compra normal** (redundante com o atalho) — pedágio é 100% guiado por `opts.pedagio`. O botão 🛣️ de marcar
+  na fatura também foi removido. Fila de melhorias futuras (não feitas): ponto mais baixo do saldo/cheque
+  especial (3 mockups prontos — o usuário adiou, prefere não usar cheque especial), cache do `index.html`
+  auto-atualizável, dedup de "Próximos vencimentos", combustível (alerta de revisão no dash, gráfico do
+  preço do litro, custo por viagem).
 
 **Últimas melhorias (PUBLICADAS, cache `202607203500`, PRs #75–#80):**
 - **Dividendos**: campo **"Cotas nesta data"** (destacado) no lançamento — pra provento pago num mês

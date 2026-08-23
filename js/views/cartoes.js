@@ -74,13 +74,12 @@ const ViewCartoes = (() => {
         <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
       </div>
       <label class="fld"><span>Fatura de</span><input type="month" name="fatura" value="${faturaInicial}"></label>
-      <label class="fld fld-check"><input type="checkbox" name="pedagio" id="compra-pedagio" ${pedagioIni ? "checked" : ""}><span>🛣️ É recarga de pedágio <span class="muted" style="font-weight:400;font-size:11px">(conta no Combustível)</span></span></label>
       <p class="muted" style="font-size:12px" id="compra-nota-fatura">A fatura é escolhida automaticamente pelo <b>dia de fechamento</b> do cartão (dá pra ajustar). Parcelas caem nas faturas seguintes; o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho.</p>
       <p class="muted" style="font-size:12px;display:none" id="compra-nota-pedagio">🛣️ Além da fatura, cria um registro de <b>pedágio</b> no Combustível (aba Abastecimentos, "só pedágio" 💳) — entra no pedágio do mês/total e na previsão. É à vista (sem parcelas). Excluir a compra tira o pedágio de lá também.</p>
     `, (form) => {
       const total = U.parseMoney(form.valor.value);
       if (total == null || !form.desc.value.trim()) return false;
-      const ehPedagio = form.pedagio && form.pedagio.checked;
+      const ehPedagio = pedagioIni; // pedágio só pelo atalho Adicionar → 🛣️ Pedágio (sem checkbox no form)
       const n = ehPedagio ? 1 : Math.max(1, Number(form.parcelas.value) || 1); // recarga de pedágio é à vista
       const vParc = Math.round((Math.abs(total) / n) * 100) / 100;
       const base = form.fatura.value || mesSel;
@@ -112,15 +111,12 @@ const ViewCartoes = (() => {
       App.render();
     });
 
-    // Ao marcar "é pedágio": esconde parcelas (é à vista) e mostra a nota do pedágio.
-    const pedagioEl = ov.querySelector('#compra-pedagio');
-    function aplicaPedagioUI() {
-      const on = pedagioEl.checked;
+    // Recarga de pedágio (só pelo atalho): esconde parcelas (é à vista) e mostra a nota do pedágio.
+    if (pedagioIni) {
       const parcLabel = ov.querySelector('input[name="parcelas"]').closest("label");
-      if (parcLabel) parcLabel.style.display = on ? "none" : "";
-      ov.querySelector('#compra-nota-pedagio').style.display = on ? "" : "none";
+      if (parcLabel) parcLabel.style.display = "none";
+      ov.querySelector('#compra-nota-pedagio').style.display = "";
     }
-    if (pedagioEl) { pedagioEl.addEventListener("change", aplicaPedagioUI); aplicaPedagioUI(); }
 
     // A "Fatura de" segue o dia de fechamento do cartão escolhido e a data da compra,
     // a menos que o usuário edite o campo manualmente.
