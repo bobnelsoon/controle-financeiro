@@ -231,7 +231,15 @@ const Store = (() => {
   }
 
   function addCardTx(tx) { state.cardTx.push(tx); save(); }
-  function removeCardTx(id) { state.cardTx = state.cardTx.filter(t => t.id !== id); save(); }
+  function removeCardTx(id) {
+    state.cardTx = state.cardTx.filter(t => t.id !== id);
+    // Excluir uma compra de PEDÁGIO tira também o registro "só pedágio" vinculado no Combustível
+    // (só os toll-only: liters null; abastecimentos pagos no cartão têm litros e não são afetados).
+    if (state.fuel && state.fuel.entries) {
+      state.fuel.entries = state.fuel.entries.filter(e => !(e.linkCardTxId === id && e.liters == null));
+    }
+    save();
+  }
   function removeCardTxIds(ids) { const set = new Set(ids); state.cardTx = (state.cardTx || []).filter(t => !set.has(t.id)); save(); }
 
   // Descobre base/parcela a partir da descrição no formato "descrição NN/MM"
