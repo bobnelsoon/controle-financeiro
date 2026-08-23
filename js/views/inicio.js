@@ -13,6 +13,7 @@ const Adicionar = (() => {
           <div class="add-opts">
             <button type="button" data-add="compra">🛒 Compra (no cartão)</button>
             <button type="button" data-add="parcelada">🧾 Compra parcelada</button>
+            <button type="button" data-add="pedagio">🛣️ Pedágio (cartão + Combustível)</button>
             <button type="button" data-add="lancamento">💸 Lançamento (pix/débito/cartão)</button>
             <button type="button" data-add="abast">⛽ Abastecimento</button>
           </div>
@@ -24,6 +25,7 @@ const Adicionar = (() => {
     const acoes = {
       compra: () => ViewCartoes.abrirNovaCompra(null),
       parcelada: () => ViewCartoes.abrirNovaCompra(null),
+      pedagio: () => ViewCartoes.abrirNovaCompra(null, { pedagio: true }),
       lancamento: () => ViewLancamentos.abrirNovo(),
       abast: () => ViewCombustivel.abrirForm(null)
     };

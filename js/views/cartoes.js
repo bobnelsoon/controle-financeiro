@@ -44,15 +44,29 @@ const ViewCartoes = (() => {
     return best ? best.accountId : null;
   }
 
-  function abrirNovaCompra(accountId) {
-    // Sem cartão específico (menu Adicionar / botão do topo): abre no ÚLTIMO cartão utilizado.
-    const contaInicial = accountId || ultimoCartaoUsado() || (Store.state.accounts[0] && Store.state.accounts[0].id);
+  // Último cartão usado PARA PEDÁGIO = cartão do registro só-pedágio mais recente (por data).
+  function ultimoCartaoPedagio() {
+    const ents = ((Store.state.fuel && Store.state.fuel.entries) || [])
+      .filter(e => e.liters == null && e.cardId && e.payment === "cartao")
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+    const cid = ents.length ? ents[ents.length - 1].cardId : null;
+    return (cid && Store.state.accounts.some(a => a.id === cid && a.type === "cartao")) ? cid : null;
+  }
+
+  // opts.pedagio = abre já como recarga de pedágio (cartão de pedágio + checkbox marcado + à vista).
+  function abrirNovaCompra(accountId, opts) {
+    const pedagioIni = !!(opts && opts.pedagio);
+    // Sem cartão específico: abre no ÚLTIMO cartão utilizado (ou no de pedágio, quando é recarga).
+    const contaInicial = accountId
+      || (pedagioIni && ultimoCartaoPedagio())
+      || ultimoCartaoUsado()
+      || (Store.state.accounts[0] && Store.state.accounts[0].id);
     const contas = Store.state.accounts.map(a =>
       `<option value="${a.id}" ${a.id === contaInicial ? "selected" : ""}>${U.esc(a.name)}</option>`).join("");
     const faturaInicial = Store.faturaDaCompra(contaInicial, U.hojeISO());
-    const ov = UI.modal("Nova compra no cartão", `
+    const ov = UI.modal(pedagioIni ? "Nova recarga de pedágio" : "Nova compra no cartão", `
       <label class="fld"><span>Cartão</span><select name="conta">${contas}</select></label>
-      <label class="fld"><span>Descrição</span><input type="text" name="desc" required placeholder="ex.: mercado, posto..."></label>
+      <label class="fld"><span>Descrição</span><input type="text" name="desc" required placeholder="ex.: mercado, posto..." value="${pedagioIni ? "Pedágio" : ""}"></label>
       <label class="fld"><span>Valor total da compra (R$)</span>
         <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00"></label>
       <div class="fld-2">
@@ -60,7 +74,7 @@ const ViewCartoes = (() => {
         <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
       </div>
       <label class="fld"><span>Fatura de</span><input type="month" name="fatura" value="${faturaInicial}"></label>
-      <label class="fld fld-check"><input type="checkbox" name="pedagio" id="compra-pedagio"><span>🛣️ É recarga de pedágio <span class="muted" style="font-weight:400;font-size:11px">(conta no Combustível)</span></span></label>
+      <label class="fld fld-check"><input type="checkbox" name="pedagio" id="compra-pedagio" ${pedagioIni ? "checked" : ""}><span>🛣️ É recarga de pedágio <span class="muted" style="font-weight:400;font-size:11px">(conta no Combustível)</span></span></label>
       <p class="muted" style="font-size:12px" id="compra-nota-fatura">A fatura é escolhida automaticamente pelo <b>dia de fechamento</b> do cartão (dá pra ajustar). Parcelas caem nas faturas seguintes; o item "Cartão (fatura)" do Fluxo Anual atualiza sozinho.</p>
       <p class="muted" style="font-size:12px;display:none" id="compra-nota-pedagio">🛣️ Além da fatura, cria um registro de <b>pedágio</b> no Combustível (aba Abastecimentos, "só pedágio" 💳) — entra no pedágio do mês/total e na previsão. É à vista (sem parcelas). Excluir a compra tira o pedágio de lá também.</p>
     `, (form) => {
@@ -100,12 +114,13 @@ const ViewCartoes = (() => {
 
     // Ao marcar "é pedágio": esconde parcelas (é à vista) e mostra a nota do pedágio.
     const pedagioEl = ov.querySelector('#compra-pedagio');
-    if (pedagioEl) pedagioEl.addEventListener("change", () => {
+    function aplicaPedagioUI() {
       const on = pedagioEl.checked;
       const parcLabel = ov.querySelector('input[name="parcelas"]').closest("label");
       if (parcLabel) parcLabel.style.display = on ? "none" : "";
       ov.querySelector('#compra-nota-pedagio').style.display = on ? "" : "none";
-    });
+    }
+    if (pedagioEl) { pedagioEl.addEventListener("change", aplicaPedagioUI); aplicaPedagioUI(); }
 
     // A "Fatura de" segue o dia de fechamento do cartão escolhido e a data da compra,
     // a menos que o usuário edite o campo manualmente.
