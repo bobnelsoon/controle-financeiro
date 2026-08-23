@@ -68,7 +68,7 @@ const ViewCartoes = (() => {
       <label class="fld"><span>Cartão</span><select name="conta">${contas}</select></label>
       <label class="fld"><span>Descrição</span><input type="text" name="desc" required placeholder="ex.: mercado, posto..." value="${pedagioIni ? "Pedágio" : ""}"></label>
       <label class="fld"><span>Valor total da compra (R$)</span>
-        <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00"></label>
+        <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00" value="${pedagioIni ? "100,00" : ""}"></label>
       <div class="fld-2">
         <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
         <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
@@ -209,25 +209,10 @@ const ViewCartoes = (() => {
         const tr = U.el(`
           <tr>
             <td>${t.date ? U.dataBR(t.date) : "—"}</td>
-            <td>${U.esc(t.desc)}${ehPed ? ' <span title="Sincronizado como pedágio no Combustível">🛣️</span>' : ""}</td>
+            <td>${U.esc(t.desc)}${ehPed ? ' <span title="Pedágio (sincronizado com o Combustível)">🛣️</span>' : ""}</td>
             <td class="num ${t.value < 0 ? "pos" : ""}">${U.brl(t.value)}</td>
-            <td style="white-space:nowrap">
-              <button class="btn-sm ped ${ehPed ? "on" : ""}" title="${ehPed ? "É pedágio — clique para tirar do Combustível" : "Marcar como pedágio (adiciona ao Combustível)"}">🛣️</button>
-              <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
-            </td>
+            <td><button class="btn-sm btn-danger rm" title="Excluir">✕</button></td>
           </tr>`);
-        tr.querySelector(".ped").addEventListener("click", () => {
-          const fe = tollDe(t.id);
-          if (fe) { Store.removeFuel(fe.id); }
-          else {
-            Store.addFuel({
-              date: t.date || U.hojeISO(), odometer: null, liters: null, pricePerLiter: null, total: null, fuelType: null,
-              local: t.desc, toll: Math.abs(t.value), obs: "Recarga de pedágio (cartão)",
-              full: false, payment: "cartao", cardId: t.accountId, linkCardTxId: t.id
-            });
-          }
-          App.render();
-        });
         tr.querySelector(".rm").addEventListener("click", () => {
           const parcelas = Store.cardTxParcelas(t);
           if (parcelas.length > 1) {

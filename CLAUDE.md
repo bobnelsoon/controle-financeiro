@@ -66,8 +66,9 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   o form compartilhado `ViewCombustivel.abrirForm(entry)` e `ViewCombustivel.abrirImportar()`.
 - `js/views/inicio.js` — a **tela inicial (lançador)** `ViewInicio` (botões Financeiro / Combustível /
   Adicionar / Atualizar) e o menu **`Adicionar.abrirMenu()`** (🛒 Compra no cartão / 🧾 Compra parcelada /
-  💸 Lançamento (pix/débito/cartão, → `ViewLancamentos.abrirNovo`) / ⛽ Abastecimento). **Recebido/Pago
-  saíram do menu** (o usuário marca isso direto no Fluxo Anual); o helper `Marcar` foi removido.
+  🛣️ Pedágio (`abrirNovaCompra(null,{pedagio:true})`) / 💸 Lançamento (pix/débito/cartão, →
+  `ViewLancamentos.abrirNovo`) / ⛽ Abastecimento). **Recebido/Pago saíram do menu** (o usuário marca isso
+  direto no Fluxo Anual); o helper `Marcar` foi removido.
 - `js/app.js` — `App`: roteador por hash com **múltiplos controles**. `App.controles` mapeia cada controle
   (`inicio`, `financeiro`, `combustivel`) → `{ nome, icone, inicio, rotas }`. O controle `inicio` é a tela
   lançadora (sem abas — a nav fica vazia). `boot()` monta o seletor de controles + o botão **➕ Adicionar**
@@ -288,6 +289,16 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
     pagamento** (incl. o cartão) do último abastecimento por data (ignora registros só-pedágio). Ao editar,
     mantém os do próprio registro. O campo **Local** tem **autocomplete** (`<datalist>`) com as cidades/postos
     do histórico (mais recentes 1º, sem repetir).
+  - **Pedágio pago no cartão → conta no Combustível**: a recarga de pedágio no cartão vira um registro
+    **"só pedágio"** no Combustível (`liters` null, `toll` = valor, vinculado por `entry.linkCardTxId` +
+    `payment:"cartao"`, `cardId`), então entra no `tollMes`/`tollTotal`/previsão e aparece na aba
+    Abastecimentos (💳). **Como criar**: (1) o form de **Compra no cartão** tem o checkbox **"🛣️ É recarga de
+    pedágio"** (à vista, esconde parcelas) e (2) o menu **Adicionar → 🛣️ Pedágio** (`abrirNovaCompra(null,
+    {pedagio:true})`) já abre no **cartão de pedágio** (`ultimoCartaoPedagio` = cartão do último registro
+    só-pedágio) com desc "Pedágio", valor **100,00** e o checkbox marcado. **Excluir** a compra remove o
+    registro de pedágio (`removeCardTx` limpa o toll-only vinculado; abastecimentos com litros não são
+    afetados). Na lista de Cartões, compras assim mostram um **indicador 🛣️** (o botão de marcar/desmarcar
+    na fatura foi removido — usa-se o atalho/checkbox).
 
 ## Convenções de UI
 
@@ -331,11 +342,21 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607199500`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607203500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#73 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#80 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Últimas melhorias (PUBLICADAS, cache `202607203500`, PRs #75–#80):**
+- **Dividendos**: campo **"Cotas nesta data"** (destacado) no lançamento — pra provento pago num mês
+  referente a outro (agosto ref. julho) usar as cotas da data certa. Guarda total+qty por lançamento.
+- **Investimentos — Ações & FIIs**: tabela **agrupada por tipo** (🏢 FIIs / 📈 Ações) com subtotal, **sem
+  coluna Tipo**, **minimizável** (cabeçalho com subtotais + total).
+- **Pedágio no cartão → Combustível**: checkbox "🛣️ É recarga de pedágio" na Compra no cartão + atalho
+  **Adicionar → 🛣️ Pedágio** (cartão de pedágio + valor 100,00 + à vista). Cria registro só-pedágio no
+  Combustível (`tollMes`/`tollTotal`/previsão). O usuário só tem o cartão **Itaú** e o pedágio é sempre
+  R$ 100 (recarrega ao chegar em R$ 30). O botão 🛣️ de marcar na fatura foi removido (usa-se o atalho).
 
 **Últimas melhorias (PUBLICADAS, cache `202607200500`, PRs #72–#73):**
 - **Dividendos reformulados** (aba Investimentos): **só manual** (ignora a busca automática), **sem seletor de
