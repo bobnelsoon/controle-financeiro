@@ -68,7 +68,7 @@ const ViewCartoes = (() => {
       <label class="fld"><span>Cartão</span><select name="conta">${contas}</select></label>
       <label class="fld"><span>Descrição</span><input type="text" name="desc" required placeholder="ex.: mercado, posto..." value="${pedagioIni ? "Pedágio" : ""}"></label>
       <label class="fld"><span>Valor total da compra (R$)</span>
-        <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00" value="${pedagioIni ? "100,00" : ""}"></label>
+        <input type="text" name="valor" required inputmode="decimal" placeholder="ex.: 250,00" value="${pedagioIni ? "350,00" : ""}"></label>
       <div class="fld-2">
         <label class="fld"><span>Parcelas (1 = à vista)</span><input type="number" name="parcelas" value="1" min="1" max="48"></label>
         <label class="fld"><span>Data da compra</span><input type="date" name="data" value="${U.hojeISO()}"></label>
