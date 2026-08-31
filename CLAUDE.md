@@ -300,7 +300,8 @@ No Dashboard, a seção de investimentos é **UM card só** (`📈 Carteira de i
     `payment:"cartao"`, `cardId`), então entra no `tollMes`/`tollTotal`/previsão e aparece na aba
     Abastecimentos (💳). **Como criar**: **só** pelo menu **Adicionar → 🛣️ Pedágio**
     (`abrirNovaCompra(null, {pedagio:true})`) — abre no **cartão de pedágio** (`ultimoCartaoPedagio` = cartão
-    do último registro só-pedágio; hoje só Itaú) com desc "Pedágio", valor **100,00** e parcelas escondidas
+    do último registro só-pedágio; hoje só Itaú) com desc "Pedágio", valor **350,00** (recarga mensal — o
+    usuário gasta ~R$ 300/mês e a recarga de 350 cobre o mês; é editável p/ 100/220) e parcelas escondidas
     (à vista). ⚠️ **Não há mais checkbox "É recarga de pedágio" no form de Compra normal** (era redundante com
     o atalho e confundia): o pedágio é 100% guiado por `opts.pedagio` (o submit usa `pedagioIni`, não um campo
     do form). **Excluir** a compra remove o registro de pedágio (`removeCardTx` limpa o toll-only vinculado;
@@ -349,11 +350,15 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607205000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607205500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#83 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#84 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607205500`, PR #84):** o atalho **Adicionar → 🛣️ Pedágio** agora
+pré-preenche **350,00** (era 100,00) — o usuário gasta ~R$ 300/mês de pedágio e passou a fazer **recarga
+mensal**; 350 cobre o mês com folga. Continua editável (recargas dele são de 100/220/350).
 
 **Últimas melhorias (PUBLICADAS, cache `202607205000`, PR #83):**
 - **Gasto por mês (Combustível) agora inclui pedágio**: o gráfico virou barra **empilhada** combustível +
