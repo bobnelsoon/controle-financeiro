@@ -221,7 +221,21 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
   (sobrescreve qtd/preço médio) ou adiciona; `type` explícito ou heurística (`/11$/` → fii). Coluna
   **"Preço médio"** (era "Preço pago"). Botão **"＋ aporte"** por ativo (`ViewInvestimentos.abrirAporte`):
   registra uma nova compra (qtd + preço desta compra) e recalcula a **média ponderada**, com prévia ao vivo
-  do novo preço médio. O KPI **"Ações e FIIs"** (redundante com Patrimônio) virou **"📈 Rentabilidade"**
+  do novo preço médio.
+  - **Histórico de aportes + estorno** (`state.investments.assets[].aportes = [{id, date, qty, price,
+    avgBefore, avgAfter, qtyBefore, qtyAfter, kind}]`, init idempotente no `migrate` — ativos existentes
+    ganham 1 registro `kind:"inicial"` com a posição atual): **cada compra fica registrada**. Toda mutação
+    de posição passa pelo Store — `Store.registrarAporte(id,{date,qty,price})` (recalcula a média E grava o
+    registro), `Store.estornarAporte(id,aporteId)` (desfaz uma compra: se for a ÚLTIMA e nada mudou, volta
+    **exato** ao `avgBefore`/`qtyBefore` gravado; senão faz a conta inversa da média ponderada; se zerar as
+    cotas, remove o ativo), `Store.estornarAporteManual(id,{qty,price})` (estorno de compra fora do
+    histórico, pela conta inversa) e `Store.resetAporteBaseline(id,kind)` (edição manual/importação
+    redefinem a base — os aportes antigos deixam de bater). O botão **↩** por ativo abre
+    `ViewInvestimentos.abrirEstorno`: lista as compras registradas (mais recente 1º, cada uma com **Estornar**)
+    + um estorno **manual** (qtd + preço, com prévia ao vivo do novo preço médio). Estornar **não afeta** os
+    snapshots de rentabilidade. Os fluxos `abrirNovoAtivo`/`abrirAporte`/`abrirEditarAtivo`/`abrirImportar`
+    chamam essas funções (não mexem em `avgPrice`/`qty` na mão).
+  O KPI **"Ações e FIIs"** (redundante com Patrimônio) virou **"📈 Rentabilidade"**
   (R$ + %, `Store.carteiraRentabilidade`). Card **"💰 Dividendos recebidos"** — **SÓ manual** (o usuário
   lança o que recebe; a busca automática `state.investments.dividends` é **ignorada** no card, só fica como
   reserva). `Store.dividendosResumo()` (sem args) soma **só os lançamentos manuais** por ativo, **sem filtro
@@ -350,11 +364,18 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607205500`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607206000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#84 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#85 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607206000`, PR #85):** **histórico de aportes + estorno** nos
+investimentos. Cada compra de ação/FII agora fica **registrada** (`assets[].aportes`), e há o botão **↩**
+por ativo que abre o histórico e permite **estornar** uma compra (volta o preço médio ponderado exato de
+antes dela) — por item ou manual (qtd+preço). Contexto: o usuário lançou um aporte com valor não finalizado
+e não lembrava o preço médio anterior; agora o app guarda tudo. Ver a convenção "Histórico de aportes +
+estorno".
 
 **Última melhoria (PUBLICADA, cache `202607205500`, PR #84):** o atalho **Adicionar → 🛣️ Pedágio** agora
 pré-preenche **350,00** (era 100,00) — o usuário gasta ~R$ 300/mês de pedágio e passou a fazer **recarga

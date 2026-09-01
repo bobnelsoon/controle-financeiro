@@ -73,16 +73,15 @@ const ViewInvestimentos = (() => {
       if (!ticker || !qty) return false;
       const existente = Store.inv().assets.find(a => a.ticker === ticker);
       if (existente) {
-        // preço médio ponderado entre a posição atual e a nova compra
-        if (preco != null) {
-          const antigo = existente.avgPrice != null ? existente.avgPrice : preco;
-          existente.avgPrice = Math.round(((antigo * existente.qty + preco * qty) / (existente.qty + qty)) * 100) / 100;
-        }
-        existente.qty += qty;
+        // preço médio ponderado entre a posição atual e a nova compra (registra no histórico).
+        if (preco != null) Store.registrarAporte(existente.id, { qty, price: preco });
+        else { existente.qty += qty; Store.save(); }
       } else {
-        Store.inv().assets.push({ id: U.id(), ticker, type: form.tipo.value, qty, avgPrice: preco });
+        const id = U.id();
+        Store.inv().assets.push({ id, ticker, type: form.tipo.value, qty, avgPrice: preco });
+        Store.resetAporteBaseline(id, "inicial");
+        Store.save();
       }
-      Store.save();
       App.render();
       atualizarCotacoes();
     });
@@ -104,10 +103,7 @@ const ViewInvestimentos = (() => {
       const qty = Number(form.qty.value);
       const preco = U.parseMoney(form.preco.value);
       if (!qty || qty <= 0 || preco == null) return false;
-      const antigo = a.avgPrice != null ? a.avgPrice : preco;
-      a.avgPrice = Math.round(((antigo * a.qty + preco * qty) / (a.qty + qty)) * 100) / 100;
-      a.qty += qty;
-      Store.save();
+      Store.registrarAporte(a.id, { qty, price: preco });
       App.render();
       atualizarCotacoes();
     });
@@ -210,10 +206,73 @@ const ViewInvestimentos = (() => {
     `, (form) => {
       const qty = Number(form.qty.value);
       if (qty <= 0) { Store.inv().assets = Store.inv().assets.filter(x => x.id !== a.id); }
-      else { a.qty = qty; a.avgPrice = U.parseMoney(form.preco.value); }
+      else { a.qty = qty; a.avgPrice = U.parseMoney(form.preco.value); Store.resetAporteBaseline(a.id, "ajuste"); }
       Store.save();
       App.render();
     });
+  }
+
+  // Histórico de aportes do ativo + estorno (desfazer uma compra). Cada compra fica registrada em
+  // a.aportes; estornar volta o preço médio ponderado pro valor de antes daquela compra.
+  function abrirEstorno(a) {
+    const kindLabel = { inicial: "posição inicial", ajuste: "ajuste manual", importado: "importado" };
+    const apLabel = (r) => r.kind && r.kind !== "aporte" ? (kindLabel[r.kind] || r.kind) : (r.date ? U.dataBR(r.date) : "—");
+    const ov = UI.modal("Aportes de " + a.ticker + " — histórico e estorno", `
+      <p class="muted" style="font-size:12.5px;margin-top:0">Posição atual: <b>${a.qty}</b> cota(s) · preço médio <b>${a.avgPrice != null ? U.brl(a.avgPrice) : "—"}</b></p>
+      <div style="font-weight:600;font-size:12.5px;margin:6px 0 4px">Compras registradas</div>
+      <div id="ap-hist"></div>
+      <div style="font-weight:600;font-size:12.5px;margin:14px 0 4px">Estornar uma compra fora do histórico</div>
+      <p class="muted" style="font-size:11.5px;margin:0 0 6px">Informe a quantidade e o preço da compra que quer desfazer — o app faz a conta inversa da média.</p>
+      <div class="fld-2">
+        <label class="fld"><span>Cotas a estornar</span><input type="number" name="qty" min="1" step="1" placeholder="ex.: 10"></label>
+        <label class="fld"><span>Preço pago por cota (R$)</span><input type="text" name="preco" inputmode="decimal" placeholder="ex.: 98,50"></label>
+      </div>
+      <div id="es-previa" class="muted" style="font-size:12.5px"></div>
+    `, (form) => {
+      const qty = Number(form.qty.value);
+      const preco = U.parseMoney(form.preco.value);
+      if (!qty || qty <= 0 || preco == null) return false;
+      if (qty > a.qty) { ov.querySelector("#es-previa").innerHTML = `<span class="neg">Você só tem ${a.qty} cota(s).</span>`; return false; }
+      Store.estornarAporteManual(a.id, { qty, price: preco });
+      App.render();
+    }, { okLabel: "Estornar (manual)" });
+
+    // Lista do histórico (mais recente primeiro), cada compra com botão Estornar.
+    const hist = ov.querySelector("#ap-hist");
+    const recs = Array.isArray(a.aportes) ? a.aportes.slice().reverse() : [];
+    if (!recs.length) {
+      hist.innerHTML = `<p class="empty" style="margin:0">Sem compras registradas ainda (aportes feitos daqui pra frente aparecem aqui).</p>`;
+    } else {
+      for (const r of recs) {
+        const row = U.el(`
+          <div class="list-row">
+            <span class="grow"><b>${apLabel(r)}</b> · ${r.qty} cota(s) a ${r.price != null ? U.brl(r.price) : "—"}<div class="muted" style="font-size:11px">média ficou ${r.avgAfter != null ? U.brl(r.avgAfter) : "—"}</div></span>
+            <button class="btn-sm btn-danger est">Estornar</button>
+          </div>`);
+        row.querySelector(".est").addEventListener("click", () => {
+          UI.confirmar(`Estornar esta compra de ${r.qty} cota(s)${r.price != null ? " a " + U.brl(r.price) : ""}?\n\nO preço médio volta pro valor de antes dela.${r.qty >= a.qty ? "\n\n⚠️ Isso zera a posição — o ativo será removido da carteira." : ""}`,
+            () => { Store.estornarAporte(a.id, r.id); App.render(); });
+        });
+        hist.appendChild(row);
+      }
+    }
+
+    // Prévia ao vivo do estorno manual.
+    const qtyEl = ov.querySelector('input[name="qty"]');
+    const precoEl = ov.querySelector('input[name="preco"]');
+    const prev = ov.querySelector("#es-previa");
+    function calc() {
+      const qty = Number(qtyEl.value);
+      const preco = U.parseMoney(precoEl.value);
+      if (!qty || qty <= 0 || preco == null || a.avgPrice == null) { prev.innerHTML = ""; return; }
+      if (qty > a.qty) { prev.innerHTML = `<span class="neg">Você só tem ${a.qty} cota(s).</span>`; return; }
+      const novaQty = a.qty - qty;
+      if (novaQty === 0) { prev.innerHTML = `Zera a posição — o ativo será <b>removido</b> da carteira.`; return; }
+      const novoAvg = Math.round(((a.avgPrice * a.qty - preco * qty) / novaQty) * 100) / 100;
+      prev.innerHTML = `Depois do estorno: <b>${novaQty}</b> cota(s) · preço médio <b class="pos">${U.brl(novoAvg)}</b> (era ${U.brl(a.avgPrice)})`;
+    }
+    qtyEl.addEventListener("input", calc);
+    precoEl.addEventListener("input", calc);
   }
 
   function abrirRendaFixa(f) {
@@ -275,8 +334,8 @@ const ViewInvestimentos = (() => {
         let type = String(r.type != null ? r.type : (r.tipo || "")).toLowerCase();
         if (type !== "fii" && type !== "acao") type = /11$/.test(ticker) ? "fii" : "acao";
         const ex = inv.assets.find(a => a.ticker === ticker);
-        if (ex) { if (qty) ex.qty = qty; if (avgPrice != null) ex.avgPrice = avgPrice; ex.type = type; }
-        else inv.assets.push({ id: U.id(), ticker, type, qty, avgPrice });
+        if (ex) { if (qty) ex.qty = qty; if (avgPrice != null) ex.avgPrice = avgPrice; ex.type = type; Store.resetAporteBaseline(ex.id, "importado"); }
+        else { const id = U.id(); inv.assets.push({ id, ticker, type, qty, avgPrice }); Store.resetAporteBaseline(id, "importado"); }
       }
       if (Array.isArray(fixed)) {
         if (form.clear.checked) inv.fixed = [];
@@ -503,11 +562,13 @@ const ViewInvestimentos = (() => {
           <td class="num"><b>${totalAtivo != null ? U.brl(totalAtivo) : "—"}</b></td>
           <td style="white-space:nowrap">
             <button class="btn-sm ap btn-pay" title="Registrar nova compra (aporte)">＋ aporte</button>
+            <button class="btn-sm es" title="Histórico de aportes / estornar compra">↩</button>
             <button class="btn-sm ed" title="Editar ativo">✎</button>
             <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
           </td>
         </tr>`);
       tr.querySelector(".ap").addEventListener("click", () => abrirAporte(a));
+      tr.querySelector(".es").addEventListener("click", () => abrirEstorno(a));
       tr.querySelector(".ed").addEventListener("click", () => abrirEditarAtivo(a));
       tr.querySelector(".rm").addEventListener("click", () => {
         UI.confirmar(`Remover ${a.ticker} da carteira?`, () => {

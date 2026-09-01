@@ -148,6 +148,17 @@ const Store = (() => {
     if (st.investments && !st.investments.dividends) st.investments.dividends = {};
     // Dividendos lançados manualmente pelo usuário (idempotente).
     if (st.investments && !st.investments.dividendsManual) st.investments.dividendsManual = {};
+    // Histórico de aportes por ativo (idempotente; só acrescenta). Ativos existentes ganham um
+    // registro-base "posição inicial" com a posição atual, pra sempre haver um ponto de partida.
+    if (st.investments && st.investments.assets) {
+      for (const a of st.investments.assets) {
+        if (a.aportes === undefined) {
+          a.aportes = (a.qty > 0)
+            ? [{ id: U.id(), date: null, qty: a.qty, price: a.avgPrice, avgBefore: null, avgAfter: a.avgPrice, qtyBefore: 0, qtyAfter: a.qty, kind: "inicial" }]
+            : [];
+        }
+      }
+    }
     // Mês a partir do qual os dados do fluxo são reais (antes disso não havia automação) — usado no
     // gráfico Receita × Despesa para não projetar meses velhos. Padrão: mês em que este app rodou 1ª vez.
     if (st.settings && st.settings.fluxoDesde === undefined) st.settings.fluxoDesde = U.ymHoje();
@@ -624,6 +635,69 @@ const Store = (() => {
 
   // ---------- Investimentos ----------
   function inv() { return state.investments; }
+  function invAsset(id) { return inv().assets.find(a => a.id === id); }
+
+  // ---------- Aportes (compras) de ações/FIIs — histórico + estorno ----------
+  // Registra uma compra: recalcula o preço médio ponderado E guarda o registro em a.aportes,
+  // pra ter o histórico e poder estornar depois. Devolve o registro criado.
+  function registrarAporte(assetId, { date, qty, price, kind } = {}) {
+    const a = invAsset(assetId);
+    if (!a || !(qty > 0) || price == null) return null;
+    if (!Array.isArray(a.aportes)) a.aportes = [];
+    const qtyBefore = a.qty, avgBefore = a.avgPrice;
+    const antigo = a.avgPrice != null ? a.avgPrice : price;
+    const avgAfter = Math.round(((antigo * a.qty + price * qty) / (a.qty + qty)) * 100) / 100;
+    a.avgPrice = avgAfter;
+    a.qty = a.qty + qty;
+    const rec = { id: U.id(), date: date || U.hojeISO(), qty, price, avgBefore, avgAfter, qtyBefore, qtyAfter: a.qty, kind: kind || "aporte" };
+    a.aportes.push(rec);
+    save();
+    return rec;
+  }
+
+  // Estorna (remove) um aporte registrado: desfaz sua contribuição no preço médio ponderado.
+  // Quando é o ÚLTIMO aporte e nada mudou desde então, volta EXATAMENTE ao estado anterior gravado
+  // (sem arredondamento); senão faz a conta inversa da média. Se zerar as cotas, remove o ativo.
+  function estornarAporte(assetId, aporteId) {
+    const a = invAsset(assetId);
+    if (!a || !Array.isArray(a.aportes) || !a.aportes.length) return false;
+    const idx = a.aportes.findIndex(r => r.id === aporteId);
+    if (idx < 0) return false;
+    const rec = a.aportes[idx];
+    const ehUltimo = idx === a.aportes.length - 1 && a.qty === rec.qtyAfter;
+    if (ehUltimo) {
+      if (!(rec.qtyBefore > 0)) { inv().assets = inv().assets.filter(x => x.id !== a.id); save(); return true; }
+      a.qty = rec.qtyBefore; a.avgPrice = rec.avgBefore;
+      a.aportes.splice(idx, 1); save(); return true;
+    }
+    const novaQty = a.qty - rec.qty;
+    if (novaQty <= 0) { inv().assets = inv().assets.filter(x => x.id !== a.id); save(); return true; }
+    a.avgPrice = Math.round(((a.avgPrice * a.qty - rec.price * rec.qty) / novaQty) * 100) / 100;
+    a.qty = novaQty;
+    a.aportes.splice(idx, 1); save(); return true;
+  }
+
+  // Estorno manual (aporte que não está no histórico): informa qtd + preço da compra a desfazer.
+  function estornarAporteManual(assetId, { qty, price } = {}) {
+    const a = invAsset(assetId);
+    if (!a || !(qty > 0) || price == null) return false;
+    const novaQty = a.qty - qty;
+    if (novaQty < 0) return false;
+    if (novaQty === 0) { inv().assets = inv().assets.filter(x => x.id !== a.id); save(); return true; }
+    a.avgPrice = Math.round(((a.avgPrice * a.qty - price * qty) / novaQty) * 100) / 100;
+    a.qty = novaQty;
+    save(); return true;
+  }
+
+  // Redefine o histórico de aportes para um único registro-base (usado quando o usuário edita a
+  // posição à mão ou importa — os aportes antigos deixam de bater com a nova posição).
+  function resetAporteBaseline(assetId, kind) {
+    const a = invAsset(assetId);
+    if (!a) return;
+    a.aportes = (a.qty > 0)
+      ? [{ id: U.id(), date: null, qty: a.qty, price: a.avgPrice, avgBefore: null, avgAfter: a.avgPrice, qtyBefore: 0, qtyAfter: a.qty, kind: kind || "ajuste" }]
+      : [];
+  }
 
   function rvTotal() {
     let t = 0;
@@ -1022,6 +1096,7 @@ const Store = (() => {
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes, janelaPagamento,
     inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
+    registrarAporte, estornarAporte, estornarAporteManual, resetAporteBaseline,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
     fuelVehicle, setFuelVehicle, fuelMaintenance, addMaintenance, updateMaintenance, removeMaintenance, clearMaintenance,
