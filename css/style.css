@@ -402,6 +402,31 @@ table.fluxo { border-collapse: separate; border-spacing: 0; font-size: 12.5px; m
 .hbar-leg i.i-toll { background: var(--warning); }
 .hbar-value { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Cartão — previsto vs realizado ("passei do previsto?") */
+.cpv-row { margin: 13px 0; }
+.cpv-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13.5px; margin-bottom: 5px; }
+.cpv-name { font-weight: 600; }
+.cpv-name .atual { font-size: 10.5px; color: var(--accent); font-weight: 700; margin-left: 6px; }
+.cpv-status { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cpv-status.over { color: var(--neg); }
+.cpv-status.under { color: var(--pos); }
+.cpv-status.prog { color: var(--accent); }
+.cpv-status.nobase { color: var(--muted); font-weight: 400; }
+.cpv-track { position: relative; height: 20px; border-radius: 6px; background: color-mix(in srgb, var(--grid) 50%, transparent); overflow: hidden; }
+.cpv-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px 0 0 6px; min-width: 2px; }
+.cpv-fill.over { background: var(--neg); }
+.cpv-fill.under { background: var(--pos); }
+.cpv-fill.prog { background: var(--accent); }
+.cpv-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--ink-2); opacity: .7; }
+.cpv-nums { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.cpv-leg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.cpv-leg span { display: inline-flex; align-items: center; gap: 5px; }
+.cpv-leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.cpv-leg i.i-u { background: var(--pos); }
+.cpv-leg i.i-o { background: var(--neg); }
+.cpv-leg i.i-p { background: var(--accent); }
+.cpv-leg i.i-mk { width: 0; height: 12px; border-radius: 0; border-left: 2px dashed var(--ink-2); }
+
 /* Composição da carteira (dashboard): barra ÚNICA segmentada + legenda */
 .comp-bar { display: flex; height: 16px; border-radius: 6px; overflow: hidden; margin: 2px 0 10px; }
 .comp-bar > span { display: block; min-width: 2px; }
