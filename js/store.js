@@ -365,10 +365,20 @@ const Store = (() => {
     if (!map[mesAtual]) map[mesAtual] = { fixo: 0, dia: 0 };
     const r2 = v => Math.round(v * 100) / 100;
     if (!Object.values(map).some(v => v.fixo > 0 || v.dia > 0)) return { linhas: [], futuras: [] };
+    // Previsto do dia a dia = MÉDIA PONDERADA das últimas (até JANELA_PREV) faturas fechadas com dia a
+    // dia, com os meses RECENTES pesando mais (peso linear: mais recente × N, ... , mais antigo da janela
+    // × 1). Assim a previsão acompanha a tendência atual em vez de ser diluída pelos meses antigos (que
+    // costumam ser mais baratos) — antes era média simples de TUDO e mostrava "passou" quase todo mês.
+    const JANELA_PREV = 3;
+    function mediaPonderadaDia(ymsAsc) {
+      const janela = ymsAsc.slice(-JANELA_PREV); // só os últimos meses; recentes por último (peso maior)
+      if (!janela.length) return null;
+      let soma = 0, somaW = 0;
+      janela.forEach((ym, i) => { const w = i + 1; soma += (map[ym].dia || 0) * w; somaW += w; });
+      return somaW ? r2(soma / somaW) : null;
+    }
     const fechadasComDia = Object.keys(map).filter(ym => ym < mesAtual && map[ym].dia > 0).sort();
-    const mediaFech = fechadasComDia.length
-      ? r2(fechadasComDia.reduce((s, ym) => s + map[ym].dia, 0) / fechadasComDia.length)
-      : null;
+    const mediaFech = mediaPonderadaDia(fechadasComDia);
 
     function linhaDe(ym, futuro) {
       const f = map[ym] || { fixo: 0, dia: 0 };
@@ -377,8 +387,8 @@ const Store = (() => {
         const diaEst = mediaFech;
         return { ym, fixo, diaReal: diaEst, diaPrev: diaEst, total: r2(fixo + (diaEst || 0)), totalPrev: r2(fixo + (diaEst || 0)), isAtual: false, futuro: true, status: "futuro", diff: 0, falta: 0 };
       }
-      const anteriores = Object.keys(map).filter(x => x < ym && x < mesAtual && map[x].dia > 0);
-      const diaPrev = anteriores.length ? r2(anteriores.reduce((s, x) => s + map[x].dia, 0) / anteriores.length) : null;
+      const anteriores = Object.keys(map).filter(x => x < ym && x < mesAtual && map[x].dia > 0).sort();
+      const diaPrev = mediaPonderadaDia(anteriores);
       const diaReal = r2(f.dia);
       const isAtual = ym === mesAtual;
       let status = "nobase", diff = 0, falta = 0;

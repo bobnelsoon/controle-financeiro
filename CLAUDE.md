@@ -126,11 +126,16 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     fatura). `cartaoFaturaPorMes` separa, por `ym`, o **FIXO** (parcelas: `cartaoEhParcela` = tem `groupId`
     ou sufixo " NN/MM" com MM>1) do **DIA A DIA** (avulsas + **pedágio** — variável). Cada linha:
     `{ ym, fixo, diaReal, diaPrev, total, totalPrev, isAtual, futuro, status, diff, falta }`, onde **diaPrev
-    (previsto do dia a dia) = média do dia a dia das faturas ANTERIORES fechadas** (expanding average),
-    `total = fixo + diaReal`, `totalPrev = fixo + diaPrev`. A **fatura vigente** = `faturaVigenteYm()`
-    (`isAtual`, parcial). Devolve `{ linhas, futuras }`: linhas = últimas `nPast` faturas com valor + a
-    vigente; **futuras** = próximas `nFut` faturas (fixo já conhecido + dia a dia estimado = média;
-    `status:"futuro"`). `status` do variável: `over` (passou, vermelho) / `under` (dentro, verde) / `prog`
+    (previsto do dia a dia) = MÉDIA PONDERADA do dia a dia das últimas (até `JANELA_PREV`=3) faturas
+    ANTERIORES fechadas** (`mediaPonderadaDia`: janela dos últimos 3 meses com dia a dia, peso LINEAR com os
+    RECENTES pesando mais — mais recente ×3, depois ×2, ×1; ex.: 3000,3500,4000 → (3000·1+3500·2+4000·3)/6 =
+    3.666,67). **Decisão do usuário (não voltar pra média simples):** era média simples de TODOS os meses
+    fechados e, como os meses antigos costumam ser mais baratos, o previsto ficava puxado pra baixo e
+    marcava "passou" quase todo mês; a ponderada acompanha a tendência recente. `total = fixo + diaReal`,
+    `totalPrev = fixo + diaPrev`. A **fatura vigente** = `faturaVigenteYm()` (`isAtual`, parcial). Devolve
+    `{ linhas, futuras }`: linhas = últimas `nPast` faturas com valor + a vigente; **futuras** = próximas
+    `nFut` faturas (fixo já conhecido + dia a dia estimado = `mediaFech`, a MESMA ponderada dos últimos 3,
+    **chapada/igual pra todos os meses futuros** — decisão do usuário, não escalar; `status:"futuro"`). `status` do variável: `over` (passou, vermelho) / `under` (dentro, verde) / `prog`
     (vigente parcial, azul — "falta ~X") / `nobase` (1ª fatura) / `futuro` (listrado). **UI** (`.cpv-*`): barra
     **empilhada** FIXO (`--fixo` roxo) + DIA A DIA (cor pelo status) com o **total previsto** numa **linha
     tracejada** (`.cpv-mark`); `.cpv-seg` (seg-fix/seg-o/seg-u/seg-p/seg-fut). **Compacto (Dashboard)**: só a
@@ -381,11 +386,18 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607208000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607209000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#87 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#88 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607209000`, PR #88):** a **previsão do dia a dia do cartão** virou
+**média PONDERADA** dos últimos 3 meses (recentes pesam mais: ×3, ×2, ×1) em vez de média simples de TODOS
+os meses (`mediaPonderadaDia`, `JANELA_PREV=3` em `cartaoPrevistoRealizado`). Contexto: como a média antiga
+juntava meses antigos (mais baratos) com peso igual, o previsto ficava baixo e marcava "passou" quase todo
+mês; agora acompanha a tendência recente. Meses futuros continuam **chapados** na mesma ponderada (decisão do
+usuário: não escalar). Ver a convenção "Cartão — fixo + variável + previsão".
 
 **Última melhoria (PUBLICADA, cache `202607208000`, PR #87):** o card do cartão virou **"fixo + variável +
 previsão"** por fatura, **nos dois lugares** (aba Cartões completo + Dashboard compacto, abaixo do quadro de
