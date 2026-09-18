@@ -130,6 +130,44 @@ const ViewCartoes = (() => {
     dataEl.addEventListener("change", recalcFatura);
   }
 
+  // Card "passei do previsto?": por mês, gasto do dia a dia (barra) vs previsto (linha tracejada =
+  // média dos meses anteriores). Verde = ficou dentro; vermelho = estourou; azul = mês atual (parcial).
+  function previsaoHTML() {
+    const { linhas } = Store.cartaoPrevistoRealizado(6);
+    if (!linhas.length) return "";
+    const max = Math.max(...linhas.map(l => Math.max(l.realizado, l.previsto || 0))) * 1.06 || 1;
+    const pct = v => Math.min(100, Math.max(0, (v / max) * 100));
+    const rows = linhas.map(l => {
+      const nome = U.MESES[U.ymParse(l.ym).m - 1] + (l.isAtual ? ` <span class="atual">EM ANDAMENTO</span>` : "");
+      let status;
+      if (l.status === "over") status = `⚠️ passou +${U.brl(l.diff)}`;
+      else if (l.status === "under") status = `✅ dentro −${U.brl(Math.abs(l.diff))}`;
+      else if (l.status === "prog") status = l.falta > 0 ? `no ritmo · falta ~${U.brl(l.falta)}` : `no ritmo`;
+      else status = "sem base ainda";
+      const marker = l.previsto != null ? `<span class="cpv-mark" style="left:${pct(l.previsto)}%"></span>` : "";
+      const numPrev = l.previsto != null ? `previsto ${U.brl(l.previsto)}` : "sem meses anteriores";
+      const rot = l.isAtual ? "já gastou" : "realizado";
+      return `
+        <div class="cpv-row">
+          <div class="cpv-top"><span class="cpv-name">${nome}</span><span class="cpv-status ${l.status}">${status}</span></div>
+          <div class="cpv-track"><span class="cpv-fill ${l.status === "nobase" ? "prog" : l.status}" style="width:${pct(l.realizado)}%"></span>${marker}</div>
+          <div class="cpv-nums"><span>${rot} ${U.brl(l.realizado)}</span><span>${numPrev}</span></div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="card mb">
+        <b style="font-size:15px">💳 Passei do previsto?</b>
+        <div class="muted" style="font-size:12px;margin:2px 0 4px">gasto do dia a dia por mês (parcelas não entram) · previsto = média dos meses anteriores</div>
+        ${rows}
+        <div class="cpv-leg">
+          <span><i class="i-u"></i>ficou dentro</span>
+          <span><i class="i-o"></i>passou do previsto</span>
+          <span><i class="i-p"></i>mês atual (parcial)</span>
+          <span><i class="i-mk"></i>previsto</span>
+        </div>
+      </div>`;
+  }
+
   function render(root) {
     const st = Store.state;
     const totalGeral = Store.faturaTotal(mesSel, null);
@@ -147,6 +185,7 @@ const ViewCartoes = (() => {
         A fatura é identificada pelo <b>mês em que é paga</b>: um gasto feito agora entra na fatura do mês seguinte.
         Por isso a tela abre na <b>fatura vigente</b> (${U.MESES[U.ymParse(mesSel).m - 1]}), que reúne os gastos do mês anterior.
         O total abastece o item <b>Cartão (fatura)</b> do Fluxo Anual.</p>
+      ${previsaoHTML()}
       <div id="card-list"></div>`;
 
     root.querySelector("#sel-mes").addEventListener("change", e => { mesSel = e.target.value; App.render(); });

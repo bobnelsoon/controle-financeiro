@@ -335,6 +335,53 @@ const Store = (() => {
     return ym;
   }
 
+  // ---------- Cartão: gasto "dia a dia" (sem parcelas) previsto vs realizado ----------
+  // Agrupa as compras do cartão pelo MÊS DA COMPRA (data), separando as compras à vista/avulsas
+  // ("dia a dia" — inclui pedágio) das PARCELAS (que já estão comprometidas). O "previsto" de um mês
+  // é a MÉDIA do dia a dia dos meses anteriores com gasto. Serve para ver se estourou o previsto.
+  function cartaoEhParcela(tx) {
+    if (tx.groupId) return true; // parcelas novas compartilham groupId
+    const m = /\s(\d{1,3})\/(\d{1,3})$/.exec(tx.desc || ""); // fallback: sufixo " NN/MM" com MM > 1
+    return !!(m && Number(m[2]) > 1);
+  }
+  function cartaoDiaADiaPorMes() {
+    const map = {};
+    for (const tx of (state.cardTx || [])) {
+      if (cartaoEhParcela(tx)) continue;
+      const ym = String(tx.date || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) continue;
+      map[ym] = (map[ym] || 0) + (tx.value || 0);
+    }
+    return map;
+  }
+  // Devolve as últimas n linhas { ym, realizado, previsto, isAtual, status, diff, falta }.
+  // status: "over" (passou), "under" (dentro), "prog" (mês atual no ritmo), "nobase" (sem meses antes).
+  function cartaoPrevistoRealizado(n = 6) {
+    const map = cartaoDiaADiaPorMes();
+    const mesAtual = U.ymHoje();
+    if (!(mesAtual in map)) map[mesAtual] = 0; // mostra o mês atual mesmo sem gasto ainda
+    const meses = Object.keys(map).sort();
+    if (meses.length <= (map[mesAtual] > 0 ? 0 : 1) && !Object.values(map).some(v => v > 0)) return { linhas: [] };
+    const comGasto = meses.filter(x => map[x] > 0);
+    const linhas = [];
+    for (const ym of meses) {
+      const anteriores = comGasto.filter(x => x < ym);
+      const previsto = anteriores.length
+        ? Math.round((anteriores.reduce((s, x) => s + map[x], 0) / anteriores.length) * 100) / 100
+        : null;
+      const realizado = Math.round((map[ym] || 0) * 100) / 100;
+      const isAtual = ym === mesAtual;
+      let status = "nobase", diff = 0, falta = 0;
+      if (previsto != null) {
+        diff = Math.round((realizado - previsto) * 100) / 100;
+        if (isAtual) { status = realizado > previsto ? "over" : "prog"; falta = Math.max(0, Math.round((previsto - realizado) * 100) / 100); }
+        else { status = realizado > previsto ? "over" : "under"; }
+      }
+      linhas.push({ ym, realizado, previsto, isAtual, status, diff, falta });
+    }
+    return { linhas: linhas.slice(-n) };
+  }
+
   // Janela de pagamento (dia 28 de um mês → dia 10 do seguinte): despesas fixas + faturas de cartão que
   // vencem nessa faixa e ainda estão PENDENTES. Ancorada em hoje: se hoje <= 10, a janela é a que começou
   // no dia 28 do mês passado; senão, a que começa no dia 28 deste mês. Devolve { iniISO, fimISO, itens }.
@@ -1094,7 +1141,7 @@ const Store = (() => {
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
-    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, loansAReceberMes, janelaPagamento,
+    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, cartaoPrevistoRealizado, loansAReceberMes, janelaPagamento,
     inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     registrarAporte, estornarAporte, estornarAporteManual, resetAporteBaseline,
     despesasPorCategoria, catName, accName,

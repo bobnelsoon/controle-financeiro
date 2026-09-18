@@ -115,12 +115,21 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     (fatura vigente = mês seguinte, avançando na data de fechamento) → "fatura de <mês+1> (gastos de <mês>)".
     Seletor **‹ Mês ›** navega só na sessão (`navYm`; **↺** volta ao automático). **Próximos vencimentos**
     seguem a **data REAL** de hoje.
-  - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init
-    idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.
+  - **Pagamento da fatura por cartão** (`state.faturasPagas["<accountId>|<ym>"] = { at, value }`, init    idempotente): `Store.pagarFatura(accountId, ym)` grava o total pago; `desfazerFatura` remove.
     `faturaRestante(ym, accountId)` = `faturaTotal − pago` (compras novas numa fatura já paga voltam a
     contar). O `autoCartaoValue` usa o **restante** (só o que falta pagar entra no "a pagar" do fluxo/dash),
     e `saldoContaAtual` **subtrai** as faturas pagas depois da âncora (o dinheiro saiu). Botão "✓ Pagar
     fatura"/"Desfazer" por cartão na aba Cartões. Simétrico a marcar um item do fluxo como Pago.
+  - **Cartão — "Passei do previsto?"** (`Store.cartaoPrevistoRealizado(n=6)`, card no topo da aba **Cartões**
+    via `previsaoHTML()`): agrupa as compras do cartão pelo **mês da COMPRA** (`tx.date`), separando o
+    **"dia a dia"** (compras avulsas + **pedágio**) das **parcelas** (`cartaoEhParcela` = tem `groupId` ou
+    sufixo " NN/MM" com MM>1 — parcelas **não entram**, são comprometidas). Por mês devolve `{ ym, realizado,
+    previsto, isAtual, status, diff, falta }`, onde **previsto = média do dia a dia dos meses ANTERIORES com
+    gasto** (expanding average, automático) e `status` ∈ `over` (passou, vermelho `--neg`) / `under` (ficou
+    dentro, verde `--pos`) / `prog` (mês atual parcial, azul `--accent` — mostra "falta ~X") / `nobase`
+    (1º mês, sem média). UI (`.cpv-*`): barra = realizado, **linha tracejada** = previsto; o mês atual é
+    parcial e enche ao vivo (se cruzar a linha antes de fechar, vira `over`). Decisão do usuário: só quer ver
+    **se estourou o previsto por mês**, não categorias; pedágio conta junto (mês que usa/não usa varia).
 
 - **Saldo em conta é automático e determinístico** (`Store.saldoContaAtual`): parte do valor informado
   (`settings.conta = { at, valor }`) e soma o que foi realizado **depois** da âncora `at`:
@@ -364,11 +373,18 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607206000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607206500`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#85 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#86 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607206500`, PR #86):** card **"💳 Passei do previsto?"** no topo da
+aba **Cartões** (`Store.cartaoPrevistoRealizado`). Por mês, mostra o **gasto do dia a dia** (compras avulsas
++ pedágio, sem parcelas) vs o **previsto** (média automática dos meses anteriores): barra + linha tracejada,
+verde = ficou dentro · vermelho = passou (+R$ X) · azul = mês atual parcial (enche ao vivo, "falta ~X"). O
+usuário só quer ver **se estourou o previsto por mês** (não categorias). Ver convenção "Cartão — Passei do
+previsto?".
 
 **Última melhoria (PUBLICADA, cache `202607206000`, PR #85):** **histórico de aportes + estorno** nos
 investimentos. Cada compra de ação/FII agora fica **registrada** (`assets[].aportes`), e há o botão **↩**
