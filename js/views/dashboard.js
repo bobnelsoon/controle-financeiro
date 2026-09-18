@@ -114,9 +114,8 @@ const ViewDashboard = (() => {
     // Composição da carteira: valor atual em Ações, FIIs e Renda fixa.
     // Ações/FIIs usam a cotação (mesma base do Patrimônio investido); renda fixa é o valor informado.
     let vAcoes = 0, vFiis = 0;
-    const invQuotes = Store.inv().quotes;
     for (const a of Store.inv().assets) {
-      const q = invQuotes[a.ticker];
+      const q = Store.quoteFor(a.ticker);
       if (!q) continue;
       const val = q.price * a.qty;
       if (a.type === "fii") vFiis += val; else vAcoes += val;

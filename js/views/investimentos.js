@@ -275,6 +275,40 @@ const ViewInvestimentos = (() => {
     precoEl.addEventListener("input", calc);
   }
 
+  // Preço manual: para tickers que as fontes automáticas não trazem (ex.: Fiagro AAZQ11). O valor
+  // informado aqui TEM PRIORIDADE sobre a busca automática e não é sobrescrito ao atualizar cotações.
+  function abrirPrecoManual(a) {
+    const man = (Store.inv().quotesManual || {})[a.ticker];
+    const auto = Store.inv().quotes[a.ticker];
+    const ov = UI.modal("Preço manual de " + a.ticker, `
+      <p class="muted" style="font-size:12.5px;margin-top:0">Use quando as fontes automáticas não trazem a cotação deste ativo (comum em <b>Fiagro</b>). O valor que você informar <b>tem prioridade</b> e não é sobrescrito ao atualizar.</p>
+      ${auto ? `<p class="muted" style="font-size:12px;margin:0 0 8px">Cotação automática atual: <b>${U.brl(auto.price)}</b> (via ${FONTE_NOME[auto.source] || auto.source})</p>` : `<p class="muted" style="font-size:12px;margin:0 0 8px">Nenhuma cotação automática foi encontrada para este ativo.</p>`}
+      <label class="fld"><span>Preço por cota (R$)</span>
+        <input type="text" name="preco" inputmode="decimal" placeholder="ex.: 6,53" value="${man && man.price != null ? U.brl(man.price).replace("R$", "").trim() : ""}"></label>
+      <div id="pm-previa" class="muted" style="font-size:12.5px"></div>
+    `, (form) => {
+      const preco = U.parseMoney(form.preco.value);
+      if (preco == null || !(preco > 0)) { ov.querySelector("#pm-previa").innerHTML = `<span class="neg">Informe um preço válido.</span>`; return false; }
+      Store.setQuoteManual(a.ticker, preco, a.name || (auto && auto.name));
+      App.render();
+    }, { okLabel: "Salvar preço", extraBtn: man ? `<button type="button" class="pm-auto btn-danger" style="margin-right:auto">Voltar ao automático</button>` : "" });
+
+    // Botão para voltar ao automático (só quando já existe um preço manual).
+    const btnAuto = ov.querySelector(".pm-auto");
+    if (btnAuto) btnAuto.addEventListener("click", () => { Store.removeQuoteManual(a.ticker); UI.closeModal(); App.render(); });
+
+    // Prévia do total ao vivo.
+    const precoEl = ov.querySelector('input[name="preco"]');
+    const prev = ov.querySelector("#pm-previa");
+    function calc() {
+      const preco = U.parseMoney(precoEl.value);
+      if (preco == null || !(preco > 0)) { prev.innerHTML = ""; return; }
+      prev.innerHTML = `${a.qty} cota(s) × ${U.brl(preco)} = <b>${U.brl(preco * a.qty)}</b>`;
+    }
+    precoEl.addEventListener("input", calc);
+    calc();
+  }
+
   function abrirRendaFixa(f) {
     const isNew = !f;
     f = f || { id: U.id(), name: "", type: "CDB", value: null, note: "" };
@@ -361,7 +395,7 @@ const ViewInvestimentos = (() => {
     const rent = Store.carteiraRentabilidade();
     const div = Store.dividendosResumo();
     // Ações & FIIs: agrupa por tipo (FIIs / Ações) com subtotal. valor atual do ativo = cotação × cotas.
-    const valAtivo = a => { const q = inv.quotes[a.ticker]; return q ? q.price * a.qty : 0; };
+    const valAtivo = a => { const q = Store.quoteFor(a.ticker); return q ? q.price * a.qty : 0; };
     let subFii = 0, subAcao = 0;
     for (const a of inv.assets) { if (a.type === "fii") subFii += valAtivo(a); else subAcao += valAtivo(a); }
     subFii = Math.round(subFii * 100) / 100; subAcao = Math.round(subAcao * 100) / 100;
@@ -369,7 +403,9 @@ const ViewInvestimentos = (() => {
     const qs = Object.values(inv.quotes);
     const ultimaAtt = qs.length ? Math.max(...qs.map(q => q.updatedAt || 0)) : null;
     const attTxt = ultimaAtt ? new Date(ultimaAtt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "nunca";
-    const fonteQuotes = fontesLabel(qs.map(q => q.source));
+    // Fontes = as das cotações automáticas + "você" se houver alguma cotação manual em uso.
+    const temManual = Object.keys(inv.quotesManual || {}).length > 0;
+    const fonteQuotes = fontesLabel(qs.map(q => q.source).concat(temManual ? ["manual"] : []));
 
     root.innerHTML = `
       <div class="page-head">
@@ -536,7 +572,8 @@ const ViewInvestimentos = (() => {
     // Tabela de renda variável — agrupada por tipo (FIIs / Ações) com subtotal, sem coluna Tipo.
     const rvBody = root.querySelector("#rv-body");
     function assetRow(a) {
-      const q = inv.quotes[a.ticker];
+      const q = Store.quoteFor(a.ticker);
+      const ehManual = q && q.source === "manual";
       const totalAtivo = q ? q.price * a.qty : null;
       let varDia = "—", varCls = "muted";
       if (q && q.prevClose) {
@@ -556,17 +593,19 @@ const ViewInvestimentos = (() => {
           <td><b>${U.esc(a.ticker)}</b>${q && q.name ? `<div class="muted" style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(q.name)}</div>` : ""}</td>
           <td class="num">${a.qty}</td>
           <td class="num">${a.avgPrice != null ? U.brl(a.avgPrice) : "—"}</td>
-          <td class="num">${q ? U.brl(q.price) : "—"}</td>
-          <td class="num ${varCls}">${varDia}</td>
+          <td class="num">${q ? U.brl(q.price) : "—"}${ehManual ? ` <span title="Preço informado por você" style="font-size:10px;color:var(--accent)">✎</span>` : ""}</td>
+          <td class="num ${varCls}">${ehManual ? "—" : varDia}</td>
           <td class="num ${ganhoCls}">${ganhoTxt}</td>
           <td class="num"><b>${totalAtivo != null ? U.brl(totalAtivo) : "—"}</b></td>
           <td style="white-space:nowrap">
             <button class="btn-sm ap btn-pay" title="Registrar nova compra (aporte)">＋ aporte</button>
             <button class="btn-sm es" title="Histórico de aportes / estornar compra">↩</button>
+            <button class="btn-sm pm" title="Definir preço manual (quando as fontes não trazem)">💲</button>
             <button class="btn-sm ed" title="Editar ativo">✎</button>
             <button class="btn-sm btn-danger rm" title="Excluir">✕</button>
           </td>
         </tr>`);
+      tr.querySelector(".pm").addEventListener("click", () => abrirPrecoManual(a));
       tr.querySelector(".ap").addEventListener("click", () => abrirAporte(a));
       tr.querySelector(".es").addEventListener("click", () => abrirEstorno(a));
       tr.querySelector(".ed").addEventListener("click", () => abrirEditarAtivo(a));

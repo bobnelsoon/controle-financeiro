@@ -22,7 +22,7 @@ const Store = (() => {
       budgets: {},
       cardTx: [],
       faturasPagas: {},
-      investments: { assets: [], fixed: [], quotes: {}, dividends: {}, history: [] },
+      investments: { assets: [], fixed: [], quotes: {}, quotesManual: {}, dividends: {}, history: [] },
       fuel: { entries: [], vehicle: defaultVehicle(), maintenance: [] }
     };
   }
@@ -148,6 +148,9 @@ const Store = (() => {
     if (st.investments && !st.investments.dividends) st.investments.dividends = {};
     // Dividendos lançados manualmente pelo usuário (idempotente).
     if (st.investments && !st.investments.dividendsManual) st.investments.dividendsManual = {};
+    // Cotações informadas à mão pelo usuário (idempotente): para tickers que as fontes automáticas não
+    // trazem (ex.: Fiagro AAZQ11). Têm PRIORIDADE sobre a busca automática e não são sobrescritas.
+    if (st.investments && !st.investments.quotesManual) st.investments.quotesManual = {};
     // Histórico de aportes por ativo (idempotente; só acrescenta). Ativos existentes ganham um
     // registro-base "posição inicial" com a posição atual, pra sempre haver um ponto de partida.
     if (st.investments && st.investments.assets) {
@@ -777,10 +780,29 @@ const Store = (() => {
       : [];
   }
 
+  // Cotação efetiva de um ticker: a MANUAL (informada pelo usuário) tem prioridade sobre a automática,
+  // porque é para tickers que as fontes não trazem (ex.: Fiagro). Devolve o mesmo formato { price,
+  // prevClose, name, source, updatedAt } com source "manual" quando é manual.
+  function quoteFor(ticker) {
+    const man = inv().quotesManual || {};
+    const m = man[ticker];
+    if (m && m.price != null) return { price: m.price, prevClose: m.price, name: m.name || ticker, source: "manual", updatedAt: m.at || null };
+    return inv().quotes[ticker] || null;
+  }
+  function setQuoteManual(ticker, price, name) {
+    if (!ticker || price == null || !(price > 0)) return;
+    if (!inv().quotesManual) inv().quotesManual = {};
+    inv().quotesManual[ticker] = { price: Math.round(price * 100) / 100, name: name || undefined, at: Date.now() };
+    save();
+  }
+  function removeQuoteManual(ticker) {
+    if (inv().quotesManual) delete inv().quotesManual[ticker];
+    save();
+  }
   function rvTotal() {
     let t = 0;
     for (const a of inv().assets) {
-      const q = inv().quotes[a.ticker];
+      const q = quoteFor(a.ticker);
       if (q) t += q.price * a.qty;
     }
     return t;
@@ -794,7 +816,7 @@ const Store = (() => {
   function carteiraRentabilidade() {
     let custo = 0, atual = 0, temBase = false;
     for (const a of inv().assets) {
-      const q = inv().quotes[a.ticker];
+      const q = quoteFor(a.ticker);
       if (a.avgPrice == null || a.avgPrice <= 0 || !q) continue;
       temBase = true;
       custo += a.avgPrice * a.qty;
@@ -1173,7 +1195,7 @@ const Store = (() => {
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
     faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, cartaoPrevistoRealizado, loansAReceberMes, janelaPagamento,
-    inv, rvTotal, rfTotal, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
+    inv, rvTotal, rfTotal, quoteFor, setQuoteManual, removeQuoteManual, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     registrarAporte, estornarAporte, estornarAporteManual, resetAporteBaseline,
     despesasPorCategoria, catName, accName,
     fuelEntries, fuelEntriesComputed, fuelStats, addFuel, addFuelMany, updateFuel, removeFuel, clearFuel,
