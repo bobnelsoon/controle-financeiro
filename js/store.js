@@ -354,16 +354,17 @@ const Store = (() => {
     }
     return map;
   }
-  // Devolve as últimas n linhas { ym, realizado, previsto, isAtual, status, diff, falta }.
-  // status: "over" (passou), "under" (dentro), "prog" (mês atual no ritmo), "nobase" (sem meses antes).
-  function cartaoPrevistoRealizado(n = 6) {
+  // Devolve { linhas, futuras }. linhas = últimos nPast meses + o atual, cada um
+  // { ym, realizado, previsto, isAtual, status, diff, falta } (status: over/under/prog/nobase).
+  // futuras = próximos nFut meses só com PREVISÃO (média dos meses fechados), status "futuro".
+  function cartaoPrevistoRealizado(nPast = 3, nFut = 3) {
     const map = cartaoDiaADiaPorMes();
     const mesAtual = U.ymHoje();
     if (!(mesAtual in map)) map[mesAtual] = 0; // mostra o mês atual mesmo sem gasto ainda
-    const meses = Object.keys(map).sort();
-    if (meses.length <= (map[mesAtual] > 0 ? 0 : 1) && !Object.values(map).some(v => v > 0)) return { linhas: [] };
-    const comGasto = meses.filter(x => map[x] > 0);
-    const linhas = [];
+    const comGasto = Object.keys(map).filter(x => map[x] > 0).sort();
+    if (!comGasto.length && !(map[mesAtual] > 0)) return { linhas: [], futuras: [] };
+    const meses = Object.keys(map).sort().filter(ym => ym <= mesAtual); // ignora compras lançadas adiantadas
+    const linhasTodas = [];
     for (const ym of meses) {
       const anteriores = comGasto.filter(x => x < ym);
       const previsto = anteriores.length
@@ -377,9 +378,22 @@ const Store = (() => {
         if (isAtual) { status = realizado > previsto ? "over" : "prog"; falta = Math.max(0, Math.round((previsto - realizado) * 100) / 100); }
         else { status = realizado > previsto ? "over" : "under"; }
       }
-      linhas.push({ ym, realizado, previsto, isAtual, status, diff, falta });
+      linhasTodas.push({ ym, realizado, previsto, isAtual, status, diff, falta });
     }
-    return { linhas: linhas.slice(-n) };
+    const idxAtual = linhasTodas.findIndex(l => l.isAtual);
+    const passadas = linhasTodas.slice(0, idxAtual);
+    const linhas = [...passadas.slice(-nPast), linhasTodas[idxAtual]];
+    // Futuro: previsão = média dos meses FECHADOS (antes do atual) com gasto.
+    const fechados = comGasto.filter(x => x < mesAtual);
+    const mediaFech = fechados.length
+      ? Math.round((fechados.reduce((s, x) => s + map[x], 0) / fechados.length) * 100) / 100
+      : null;
+    const futuras = [];
+    if (mediaFech != null) {
+      let ym = U.ymAdd(mesAtual, 1);
+      for (let i = 0; i < nFut; i++) { futuras.push({ ym, realizado: mediaFech, previsto: mediaFech, isAtual: false, futuro: true, status: "futuro", diff: 0, falta: 0 }); ym = U.ymAdd(ym, 1); }
+    }
+    return { linhas, futuras };
   }
 
   // Janela de pagamento (dia 28 de um mês → dia 10 do seguinte): despesas fixas + faturas de cartão que

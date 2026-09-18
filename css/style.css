@@ -417,6 +417,7 @@ table.fluxo { border-collapse: separate; border-spacing: 0; font-size: 12.5px; m
 .cpv-fill.over { background: var(--neg); }
 .cpv-fill.under { background: var(--pos); }
 .cpv-fill.prog { background: var(--accent); }
+.cpv-fill.futuro { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 32%, transparent) 0 6px, color-mix(in srgb, var(--accent) 15%, transparent) 6px 12px); }
 .cpv-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--ink-2); opacity: .7; }
 .cpv-nums { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .cpv-leg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -425,7 +426,9 @@ table.fluxo { border-collapse: separate; border-spacing: 0; font-size: 12.5px; m
 .cpv-leg i.i-u { background: var(--pos); }
 .cpv-leg i.i-o { background: var(--neg); }
 .cpv-leg i.i-p { background: var(--accent); }
+.cpv-leg i.i-fut { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 32%, transparent) 0 3px, color-mix(in srgb, var(--accent) 15%, transparent) 3px 6px); }
 .cpv-leg i.i-mk { width: 0; height: 12px; border-radius: 0; border-left: 2px dashed var(--ink-2); }
+.cpv-sep { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 2px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* Composição da carteira (dashboard): barra ÚNICA segmentada + legenda */
 .comp-bar { display: flex; height: 16px; border-radius: 6px; overflow: hidden; margin: 2px 0 10px; }

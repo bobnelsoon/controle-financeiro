@@ -134,6 +134,15 @@ const ViewCartoes = (() => {
   // média dos meses anteriores). Verde = ficou dentro; vermelho = estourou; azul = mês atual (parcial).
   // Uma linha (mês) do card.
   function cpvRowHTML(l, pct) {
+    if (l.futuro) {
+      const nome = U.MESES[U.ymParse(l.ym).m - 1] + ` <span class="atual" style="color:var(--muted)">PREVISÃO</span>`;
+      return `
+        <div class="cpv-row">
+          <div class="cpv-top"><span class="cpv-name">${nome}</span><span class="cpv-status nobase">~${U.brl(l.previsto)}</span></div>
+          <div class="cpv-track"><span class="cpv-fill futuro" style="width:${pct(l.previsto)}%"></span></div>
+          <div class="cpv-nums"><span>estimado</span><span>média dos meses anteriores</span></div>
+        </div>`;
+    }
     const nome = U.MESES[U.ymParse(l.ym).m - 1] + (l.isAtual ? ` <span class="atual">EM ANDAMENTO</span>` : "");
     let status;
     if (l.status === "over") status = `⚠️ passou +${U.brl(l.diff)}`;
@@ -155,16 +164,18 @@ const ViewCartoes = (() => {
       <span><i class="i-u"></i>ficou dentro</span>
       <span><i class="i-o"></i>passou do previsto</span>
       <span><i class="i-p"></i>mês atual (parcial)</span>
+      <span><i class="i-fut"></i>previsão</span>
       <span><i class="i-mk"></i>previsto</span>
     </div>`;
 
-  // opts.compact = versão do Dashboard: mês atual à mostra, meses anteriores minimizados (toque abre).
-  // Sem opts = versão completa (aba Cartões): todos os meses abertos. Devolve "" se não há dados.
+  // opts.compact = versão do Dashboard: mês atual à mostra, meses anteriores + próximos minimizados
+  // (toque abre). Sem opts = versão completa (aba Cartões): tudo aberto. Devolve "" se não há dados.
   function previsaoCard(opts) {
     const compact = !!(opts && opts.compact);
-    const { linhas } = Store.cartaoPrevistoRealizado(compact ? 12 : 6);
+    const { linhas, futuras } = Store.cartaoPrevistoRealizado(3, 3);
     if (!linhas.length) return "";
-    const max = Math.max(...linhas.map(l => Math.max(l.realizado, l.previsto || 0))) * 1.06 || 1;
+    const todas = linhas.concat(futuras);
+    const max = Math.max(...todas.map(l => Math.max(l.realizado, l.previsto || 0))) * 1.06 || 1;
     const pct = v => Math.min(100, Math.max(0, (v / max) * 100));
     if (!compact) {
       return `
@@ -172,21 +183,27 @@ const ViewCartoes = (() => {
           <b style="font-size:15px">💳 Passei do previsto?</b>
           <div class="muted" style="font-size:12px;margin:2px 0 4px">gasto do dia a dia por mês (parcelas não entram) · previsto = média dos meses anteriores</div>
           ${linhas.map(l => cpvRowHTML(l, pct)).join("")}
+          ${futuras.length ? `<div class="cpv-sep">Próximos meses (previsão)</div>${futuras.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
           ${CPV_LEG}
         </div>`;
     }
-    // Compacto: só o mês atual visível; os anteriores + legenda vão num bloco que abre no toque.
+    // Compacto: só o mês atual visível; anteriores + próximos + legenda abrem no toque.
     const atual = linhas.filter(l => l.isAtual);
     const anteriores = linhas.filter(l => !l.isAtual);
     const atualHTML = atual.length ? atual.map(l => cpvRowHTML(l, pct)).join("")
       : `<p class="muted" style="font-size:12.5px;margin:6px 0">Sem gasto no cartão neste mês ainda.</p>`;
-    const maisHTML = anteriores.length ? `
+    const temMais = anteriores.length || futuras.length;
+    const maisHTML = temMais ? `
       <button type="button" class="dv-head" id="cpv-toggle" aria-expanded="false">
         <span class="chev">▸</span>
-        <span class="dv-head-txt"><span style="font-weight:600;font-size:13px">Meses anteriores</span>
-          <span class="muted" style="font-size:11.5px">${anteriores.length} mês(es) · toque pra ver</span></span>
+        <span class="dv-head-txt"><span style="font-weight:600;font-size:13px">Ver histórico e previsão</span>
+          <span class="muted" style="font-size:11.5px">últimos ${anteriores.length} + próximos ${futuras.length} meses</span></span>
       </button>
-      <div id="cpv-body" class="dv-body" hidden>${anteriores.map(l => cpvRowHTML(l, pct)).join("")}${CPV_LEG}</div>`
+      <div id="cpv-body" class="dv-body" hidden>
+        ${anteriores.length ? `<div class="cpv-sep">Meses anteriores</div>${anteriores.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
+        ${futuras.length ? `<div class="cpv-sep">Próximos meses (previsão)</div>${futuras.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
+        ${CPV_LEG}
+      </div>`
       : CPV_LEG;
     return `
       <div class="card mt">
