@@ -130,42 +130,114 @@ const ViewCartoes = (() => {
     dataEl.addEventListener("change", recalcFatura);
   }
 
-  // Card "passei do previsto?": por mês, gasto do dia a dia (barra) vs previsto (linha tracejada =
-  // média dos meses anteriores). Verde = ficou dentro; vermelho = estourou; azul = mês atual (parcial).
-  function previsaoHTML() {
-    const { linhas } = Store.cartaoPrevistoRealizado(6);
-    if (!linhas.length) return "";
-    const max = Math.max(...linhas.map(l => Math.max(l.realizado, l.previsto || 0))) * 1.06 || 1;
-    const pct = v => Math.min(100, Math.max(0, (v / max) * 100));
-    const rows = linhas.map(l => {
-      const nome = U.MESES[U.ymParse(l.ym).m - 1] + (l.isAtual ? ` <span class="atual">EM ANDAMENTO</span>` : "");
-      let status;
-      if (l.status === "over") status = `⚠️ passou +${U.brl(l.diff)}`;
-      else if (l.status === "under") status = `✅ dentro −${U.brl(Math.abs(l.diff))}`;
-      else if (l.status === "prog") status = l.falta > 0 ? `no ritmo · falta ~${U.brl(l.falta)}` : `no ritmo`;
-      else status = "sem base ainda";
-      const marker = l.previsto != null ? `<span class="cpv-mark" style="left:${pct(l.previsto)}%"></span>` : "";
-      const numPrev = l.previsto != null ? `previsto ${U.brl(l.previsto)}` : "sem meses anteriores";
-      const rot = l.isAtual ? "já gastou" : "realizado";
-      return `
-        <div class="cpv-row">
-          <div class="cpv-top"><span class="cpv-name">${nome}</span><span class="cpv-status ${l.status}">${status}</span></div>
-          <div class="cpv-track"><span class="cpv-fill ${l.status === "nobase" ? "prog" : l.status}" style="width:${pct(l.realizado)}%"></span>${marker}</div>
-          <div class="cpv-nums"><span>${rot} ${U.brl(l.realizado)}</span><span>${numPrev}</span></div>
-        </div>`;
-    }).join("");
+  // Card "Passei do previsto?": por FATURA, barra empilhada FIXO (parcelas) + DIA A DIA (variável),
+  // com o TOTAL PREVISTO marcado (tracejado). Verde = variável dentro; vermelho = passou; azul = fatura
+  // vigente (parcial); listrado = previsão (mês futuro). Uma linha (mês) do card.
+  function cpvRowHTML(l, pct) {
+    const nomeMes = U.MESES[U.ymParse(l.ym).m - 1];
+    const tag = l.isAtual ? ` <span class="atual">EM ANDAMENTO</span>`
+      : l.futuro ? ` <span class="atual" style="color:var(--muted)">PREVISÃO</span>` : "";
+    // segmentos: fixo (roxo) + dia a dia (cor pelo status)
+    const segDia = l.futuro ? "seg-fut" : (l.status === "over" ? "seg-o" : l.status === "under" ? "seg-u" : "seg-p");
+    const fixoSeg = l.fixo > 0 ? `<span class="cpv-seg seg-fix" style="width:${pct(l.fixo)}%"></span>` : "";
+    const diaSeg = (l.diaReal > 0) ? `<span class="cpv-seg ${segDia}" style="width:${pct(l.diaReal)}%"></span>` : "";
+    const marker = (!l.futuro && l.totalPrev != null) ? `<span class="cpv-mark" style="left:${pct(l.totalPrev)}%"></span>` : "";
+    let status, scls = l.status;
+    if (l.futuro) { status = `~${U.brl(l.total)}`; scls = "nobase"; }
+    else if (l.status === "over") status = `⚠️ variável passou +${U.brl(l.diff)}`;
+    else if (l.status === "under") status = `✅ dentro −${U.brl(Math.abs(l.diff))}`;
+    else if (l.status === "prog") status = l.falta > 0 ? `no ritmo · falta ~${U.brl(l.falta)}` : `no ritmo`;
+    else status = "sem base ainda";
+    const fixoTxt = `<b style="color:var(--fixo)">fixo ${U.brl(l.fixo)}</b>`;
+    let numL, numR;
+    if (l.futuro) {
+      numL = `${fixoTxt} + dia a dia ~${U.brl(l.diaReal || 0)} (estimado)`;
+      numR = `fatura prevista`;
+    } else if (l.isAtual) {
+      numL = `${fixoTxt} + dia a dia ${U.brl(l.diaReal)} <span class="muted">(parcial)</span>`;
+      numR = l.totalPrev != null ? `previsto ${U.brl(l.totalPrev)}` : "sem meses anteriores";
+    } else {
+      numL = `${fixoTxt} + dia a dia ${U.brl(l.diaReal)} = <b>${U.brl(l.total)}</b>`;
+      numR = l.totalPrev != null ? `previsto ${U.brl(l.totalPrev)}` : "sem meses anteriores";
+    }
     return `
-      <div class="card mb">
-        <b style="font-size:15px">💳 Passei do previsto?</b>
-        <div class="muted" style="font-size:12px;margin:2px 0 4px">gasto do dia a dia por mês (parcelas não entram) · previsto = média dos meses anteriores</div>
-        ${rows}
-        <div class="cpv-leg">
-          <span><i class="i-u"></i>ficou dentro</span>
-          <span><i class="i-o"></i>passou do previsto</span>
-          <span><i class="i-p"></i>mês atual (parcial)</span>
-          <span><i class="i-mk"></i>previsto</span>
-        </div>
+      <div class="cpv-row">
+        <div class="cpv-top"><span class="cpv-name">${nomeMes}${tag}</span><span class="cpv-status ${scls}">${status}</span></div>
+        <div class="cpv-track">${fixoSeg}${diaSeg}${marker}</div>
+        <div class="cpv-nums"><span>${numL}</span><span>${numR}</span></div>
       </div>`;
+  }
+  const CPV_LEG = `
+    <div class="cpv-leg">
+      <span><i class="i-fix"></i>fixo (parcelas)</span>
+      <span><i class="i-u"></i>dia a dia dentro</span>
+      <span><i class="i-o"></i>passou</span>
+      <span><i class="i-p"></i>fatura vigente</span>
+      <span><i class="i-fut"></i>previsão</span>
+      <span><i class="i-mk"></i>total previsto</span>
+    </div>`;
+
+  // opts.compact = versão do Dashboard: fatura vigente à mostra, meses anteriores + próximos minimizados
+  // (toque abre). Sem opts = versão completa (aba Cartões): tudo aberto. Devolve "" se não há dados.
+  function previsaoCard(opts) {
+    const compact = !!(opts && opts.compact);
+    const { linhas, futuras } = Store.cartaoPrevistoRealizado(3, 3);
+    if (!linhas.length) return "";
+    const todas = linhas.concat(futuras);
+    const max = Math.max(...todas.map(l => Math.max(l.total || 0, l.totalPrev || 0))) * 1.06 || 1;
+    const pct = v => Math.min(100, Math.max(0, (v / max) * 100));
+    const SUB = `fixo (parcelas) + dia a dia (variável) por fatura · previsto = média do dia a dia dos meses anteriores`;
+    if (!compact) {
+      return `
+        <div class="card mb">
+          <b style="font-size:15px">💳 Cartão — fixo + variável + previsão</b>
+          <div class="muted" style="font-size:12px;margin:2px 0 4px">${SUB}</div>
+          ${linhas.map(l => cpvRowHTML(l, pct)).join("")}
+          ${futuras.length ? `<div class="cpv-sep">Próximos meses (previsão)</div>${futuras.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
+          ${CPV_LEG}
+        </div>`;
+    }
+    // Compacto: só a fatura vigente visível; anteriores + próximos + legenda abrem no toque.
+    const atual = linhas.filter(l => l.isAtual);
+    const anteriores = linhas.filter(l => !l.isAtual);
+    const atualHTML = atual.length ? atual.map(l => cpvRowHTML(l, pct)).join("")
+      : `<p class="muted" style="font-size:12.5px;margin:6px 0">Sem gasto no cartão nesta fatura ainda.</p>`;
+    const temMais = anteriores.length || futuras.length;
+    const maisHTML = temMais ? `
+      <button type="button" class="dv-head" id="cpv-toggle" aria-expanded="false">
+        <span class="chev">▸</span>
+        <span class="dv-head-txt"><span style="font-weight:600;font-size:13px">Ver histórico e previsão</span>
+          <span class="muted" style="font-size:11.5px">últimos ${anteriores.length} + próximos ${futuras.length} meses</span></span>
+      </button>
+      <div id="cpv-body" class="dv-body" hidden>
+        ${anteriores.length ? `<div class="cpv-sep">Meses anteriores</div>${anteriores.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
+        ${futuras.length ? `<div class="cpv-sep">Próximos meses (previsão)</div>${futuras.map(l => cpvRowHTML(l, pct)).join("")}` : ""}
+        ${CPV_LEG}
+      </div>`
+      : CPV_LEG;
+    return `
+      <div class="card mt">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <b style="font-size:15px">💳 Cartão — fixo + variável</b>
+          <a href="#cartoes" class="muted" style="font-size:12px;text-decoration:none">ver todos →</a>
+        </div>
+        <div class="muted" style="font-size:12px;margin:2px 0 6px">parcelas (fixo) + dia a dia · previsto = média dos meses anteriores</div>
+        ${atualHTML}
+        ${maisHTML}
+      </div>`;
+  }
+
+  // Liga o toggle "Meses anteriores" da versão compacta (chamado pelo Dashboard após render).
+  function ligarPrevisao(root) {
+    const t = root.querySelector("#cpv-toggle");
+    if (!t) return;
+    t.addEventListener("click", () => {
+      const body = root.querySelector("#cpv-body");
+      const abrir = body.hidden;
+      body.hidden = !abrir;
+      t.classList.toggle("open", abrir);
+      t.setAttribute("aria-expanded", abrir);
+    });
   }
 
   function render(root) {
@@ -185,7 +257,7 @@ const ViewCartoes = (() => {
         A fatura é identificada pelo <b>mês em que é paga</b>: um gasto feito agora entra na fatura do mês seguinte.
         Por isso a tela abre na <b>fatura vigente</b> (${U.MESES[U.ymParse(mesSel).m - 1]}), que reúne os gastos do mês anterior.
         O total abastece o item <b>Cartão (fatura)</b> do Fluxo Anual.</p>
-      ${previsaoHTML()}
+      ${previsaoCard()}
       <div id="card-list"></div>`;
 
     root.querySelector("#sel-mes").addEventListener("change", e => { mesSel = e.target.value; App.render(); });
@@ -292,5 +364,5 @@ const ViewCartoes = (() => {
     if (!algum && !st.accounts.length) list.innerHTML = `<div class="card"><p class="empty">Nenhum cartão cadastrado.</p></div>`;
   }
 
-  return { render, abrirNovaCompra };
+  return { render, abrirNovaCompra, previsaoCard, ligarPrevisao };
 })();

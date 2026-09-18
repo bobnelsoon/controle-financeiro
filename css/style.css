@@ -13,6 +13,7 @@
   --accent-soft: #cde2fb;
   --pos: #006300;
   --neg: #c22a2a;
+  --fixo: #7b61c9;
   --good: #0ca30c;
   --warning: #fab219;
   --critical: #d03b3b;
@@ -37,6 +38,7 @@
     --accent-soft: #10315c;
     --pos: #34c05e;
     --neg: #e66767;
+    --fixo: #a394e6;
     --chip-pago: #12360f;
     --chip-pago-ink: #6fd06f;
     --chip-receb: #10315c;
@@ -412,20 +414,25 @@ table.fluxo { border-collapse: separate; border-spacing: 0; font-size: 12.5px; m
 .cpv-status.under { color: var(--pos); }
 .cpv-status.prog { color: var(--accent); }
 .cpv-status.nobase { color: var(--muted); font-weight: 400; }
-.cpv-track { position: relative; height: 20px; border-radius: 6px; background: color-mix(in srgb, var(--grid) 50%, transparent); overflow: hidden; }
-.cpv-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px 0 0 6px; min-width: 2px; }
-.cpv-fill.over { background: var(--neg); }
-.cpv-fill.under { background: var(--pos); }
-.cpv-fill.prog { background: var(--accent); }
+.cpv-track { position: relative; height: 20px; border-radius: 6px; background: color-mix(in srgb, var(--grid) 50%, transparent); overflow: hidden; display: flex; }
+.cpv-seg { height: 100%; flex: none; }
+.cpv-seg.seg-fix { background: var(--fixo); }
+.cpv-seg.seg-o { background: var(--neg); }
+.cpv-seg.seg-u { background: var(--pos); }
+.cpv-seg.seg-p { background: var(--accent); }
+.cpv-seg.seg-fut { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 32%, transparent) 0 6px, color-mix(in srgb, var(--accent) 15%, transparent) 6px 12px); }
 .cpv-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--ink-2); opacity: .7; }
 .cpv-nums { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .cpv-leg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .cpv-leg span { display: inline-flex; align-items: center; gap: 5px; }
 .cpv-leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .cpv-leg i.i-u { background: var(--pos); }
+.cpv-leg i.i-fix { background: var(--fixo); }
 .cpv-leg i.i-o { background: var(--neg); }
 .cpv-leg i.i-p { background: var(--accent); }
+.cpv-leg i.i-fut { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 32%, transparent) 0 3px, color-mix(in srgb, var(--accent) 15%, transparent) 3px 6px); }
 .cpv-leg i.i-mk { width: 0; height: 12px; border-radius: 0; border-left: 2px dashed var(--ink-2); }
+.cpv-sep { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 2px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* Composição da carteira (dashboard): barra ÚNICA segmentada + legenda */
 .comp-bar { display: flex; height: 16px; border-radius: 6px; overflow: hidden; margin: 2px 0 10px; }
