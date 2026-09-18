@@ -205,6 +205,8 @@ const ViewDashboard = (() => {
         </div>
       </div>` : ""}
 
+      ${ViewCartoes.previsaoCard({ compact: true })}
+
       ${janela.itens.length ? `
       <div class="card mt">
         <button type="button" class="jp-head" id="jp-toggle" aria-expanded="false">
@@ -344,6 +346,8 @@ const ViewDashboard = (() => {
     }
 
     // Janela de pagamento: minimizada por padrão — o cabeçalho abre/fecha a lista.
+    ViewCartoes.ligarPrevisao(root);
+
     const jpToggle = root.querySelector("#jp-toggle");
     if (jpToggle) jpToggle.addEventListener("click", () => {
       const body = root.querySelector("#dash-janela");
