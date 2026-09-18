@@ -50,10 +50,23 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   `Store.brapiToken()`. `fetchAll(tickers, token)` devolve `{ ok, falhas, dividends }`: tenta brapi (cota +
   dividendos), depois **HG Brasil** em lote (`viaHGMany`, chave exposta `HG_KEY` browser+domain-locked em
   `bobnelsoon.github.io` — essa pode ficar no código) para o que faltar de cotação, e por fim reservas
-  individuais (mfinance → Yahoo). **Reserva de dividendos: mfinance** (`fetchDividend`/`fetchDividendsAll`
-  via `/{fiis|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`, últimos ~48), usada só para
-  os ativos que o brapi não trouxe (ex.: sem token). `ViewInvestimentos.atualizarCotacoes` salva `saveQuotes`
-  + `saveDividends` da mesma chamada do brapi.
+  individuais (mfinance → Yahoo). A **mfinance** tenta os endpoints na ordem `["fiis","fiagros","stocks"]`
+  para ticker terminando em 11 (senão `["stocks","fiis","fiagros"]`) — o **`fiagros` foi incluído** porque
+  Fiagro (ex.: **AAZQ11**, AZ Quest) fica num endpoint à parte e as outras fontes grátis às vezes não trazem.
+  **Reserva de dividendos: mfinance** (`fetchDividend`/`fetchDividendsAll` via
+  `/{fiis|fiagros|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`, últimos ~48), usada só
+  para os ativos que o brapi não trouxe (ex.: sem token). `ViewInvestimentos.atualizarCotacoes` salva
+  `saveQuotes` + `saveDividends` da mesma chamada do brapi.
+  - **Cotação manual (preço por ativo)**: quando NENHUMA fonte traz o ticker (Fiagro é o caso comum), o
+    usuário informa o preço à mão. `state.investments.quotesManual = { TICKER: { price, name?, at } }` (init
+    idempotente no `migrate`). **`Store.quoteFor(ticker)` é o acessor ÚNICO** de cotação — a manual TEM
+    PRIORIDADE (source `"manual"`, rótulo "você") sobre `quotes[ticker]` (automática) e **não é sobrescrita**
+    por `saveQuotes`. `Store.setQuoteManual(ticker,price,name)`/`removeQuoteManual(ticker)`. **Todos** os
+    cálculos de RV usam `quoteFor` (`rvTotal`, `carteiraRentabilidade`, `valAtivo` da view e a composição do
+    Dashboard) — nunca ler `quotes[ticker]` direto pra exibir. UI: botão **💲** por ativo
+    (`ViewInvestimentos.abrirPrecoManual`) com prévia ao vivo (cotas × preço) e **"Voltar ao automático"**
+    (via `opts.extraBtn` do modal); a linha do ativo com preço manual mostra uma marca **✎** e esconde o "var
+    dia" (não há fechamento anterior pra comparar).
 - `js/sync.js` — `Sync`: sincronização entre aparelhos via Gist privado do GitHub. **Abrir o app NÃO conta
   como alteração**: `Store.load`/migração salvam com `loadingState=true`, então `Store.save` **não** chama
   `Sync.onLocalSave` (não bumpa `cfg.lastChange`). Sem isso, o aparelho recém-aberto se marcava como "o mais
@@ -386,11 +399,18 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607209000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607210000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#88 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#89 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607210000`, PR #89):** **cotação de Fiagro / preço manual.** O
+AAZQ11 (Fiagro AZ Quest) não vinha das fontes automáticas. Dois ajustes: (1) a **mfinance** agora tenta o
+endpoint **`fiagros`** (cotação e dividendos), não só `fiis`/`stocks`; (2) **preço manual por ativo** —
+botão **💲** em cada ativo abre `abrirPrecoManual`, o usuário digita a cotação e ela **tem prioridade** sobre
+a automática (não é sobrescrita ao atualizar), com **"Voltar ao automático"**. Novo acessor **único**
+`Store.quoteFor(ticker)` (manual → automática) usado em todo cálculo de RV. Ver a convenção "Cotação manual".
 
 **Última melhoria (PUBLICADA, cache `202607209000`, PR #88):** a **previsão do dia a dia do cartão** virou
 **média PONDERADA** dos últimos 3 meses (recentes pesam mais: ×3, ×2, ×1) em vez de média simples de TODOS

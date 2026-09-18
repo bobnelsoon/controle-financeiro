@@ -101,9 +101,9 @@ const Quotes = (() => {
 
   // mfinance tem endpoints separados para FIIs e ações — tenta os dois
   async function viaMfinance(ticker) {
-    const bases = ticker.match(/11B?$/) // FIIs geralmente terminam em 11
-      ? ["fiis", "stocks"]
-      : ["stocks", "fiis"];
+    const bases = ticker.match(/11B?$/) // FIIs e FIAGROs geralmente terminam em 11
+      ? ["fiis", "fiagros", "stocks"]  // Fiagro (ex.: AAZQ11) fica num endpoint à parte
+      : ["stocks", "fiis", "fiagros"];
     let ultimoErro = null;
     for (const base of bases) {
       try {
@@ -232,7 +232,7 @@ const Quotes = (() => {
 
   // mfinance: histórico por cota. FIIs em /fiis/dividends, ações em /stocks/dividends.
   async function viaMfinanceDividends(ticker) {
-    const bases = ticker.match(/11B?$/) ? ["fiis", "stocks"] : ["stocks", "fiis"];
+    const bases = ticker.match(/11B?$/) ? ["fiis", "fiagros", "stocks"] : ["stocks", "fiis", "fiagros"];
     let ultimoErro = null;
     for (const base of bases) {
       try {
