@@ -50,9 +50,15 @@ Scripts globais em IIFE, carregados em ordem no `index.html` (sem módulos ES):
   `Store.brapiToken()`. `fetchAll(tickers, token)` devolve `{ ok, falhas, dividends }`: tenta brapi (cota +
   dividendos), depois **HG Brasil** em lote (`viaHGMany`, chave exposta `HG_KEY` browser+domain-locked em
   `bobnelsoon.github.io` — essa pode ficar no código) para o que faltar de cotação, e por fim reservas
-  individuais (mfinance → Yahoo). A **mfinance** tenta os endpoints na ordem `["fiis","fiagros","stocks"]`
-  para ticker terminando em 11 (senão `["stocks","fiis","fiagros"]`) — o **`fiagros` foi incluído** porque
-  Fiagro (ex.: **AAZQ11**, AZ Quest) fica num endpoint à parte e as outras fontes grátis às vezes não trazem.
+  individuais (mfinance → Yahoo). ⚠️ **Fiagro (ex.: AAZQ11, AZ Quest) NÃO está no plano grátis do brapi**
+  (que cobre ações/FIIs/ETFs/BDRs/índices), e o **Yahoo é bloqueado por CORS** no navegador — então a
+  fonte automática que funciona pra Fiagro é o **HG Brasil** (a doc do HG diz cobrir FII e **FIAGRO** via
+  `stock_price`, e a chave é domain-locked no domínio do usuário). Por isso: (1) o **HG é consultado UM
+  ticker por chamada** (`viaHG1` via `mapLimit`, 3 em paralelo) para o que o brapi não trouxe — o
+  multi-símbolo por vírgula (`viaHGMany`) costuma ser recurso pago e derrubava a chamada; (2) o
+  **`viaBrapiOne` tenta SÓ a cotação** (sem `dividends=true`) se a chamada com dividendos falhar (o módulo
+  de dividendos pode derrubar a resposta de Fiagro no grátis). A **mfinance** (reserva) tenta os endpoints
+  na ordem `["fiis","fiagros","stocks"]` p/ ticker em 11 (senão `["stocks","fiis","fiagros"]`).
   **Reserva de dividendos: mfinance** (`fetchDividend`/`fetchDividendsAll` via
   `/{fiis|fiagros|stocks}/dividends/{ticker}` — histórico `list:[{value,payDate}]`, últimos ~48), usada só
   para os ativos que o brapi não trouxe (ex.: sem token). `ViewInvestimentos.atualizarCotacoes` salva
@@ -399,11 +405,19 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607210000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607211000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#89 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#90 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607211000`, PR #90):** **cotação automática de Fiagro (AAZQ11).**
+Diagnóstico (usuário confirmou: token do brapi cadastrado, só o AAZQ11 falha): brapi grátis não cobre
+Fiagro; Yahoo é CORS-blocked; **quem cobre Fiagro no navegador é o HG Brasil**. Ajustes: (1) HG consultado
+**um ticker por chamada** (`viaHG1`/`mapLimit`) em vez do multi-símbolo por vírgula (que é pago); (2)
+`viaBrapiOne` tenta **só a cotação** se a chamada com `dividends=true` falhar. Validado em headless com
+`fetch` simulado (brapi só-cotação e HG por ticker recuperam o AAZQ11). ⚠️ Não testável ao vivo (rede
+bloqueia as APIs) — se ainda ficar "—", nenhuma fonte grátis serve esse Fiagro e resta o preço manual (💲).
 
 **Última melhoria (PUBLICADA, cache `202607210000`, PR #89):** **cotação de Fiagro / preço manual.** O
 AAZQ11 (Fiagro AZ Quest) não vinha das fontes automáticas. Dois ajustes: (1) a **mfinance** agora tenta o

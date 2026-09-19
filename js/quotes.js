@@ -27,19 +27,29 @@ const Quotes = (() => {
   }
 
   async function viaBrapiOne(ticker, token) {
-    const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?dividends=true` +
-      (token ? `&token=${encodeURIComponent(token)}` : "");
-    const r = await fetch(url);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const j = await r.json();
-    const q = j && j.results && j.results[0];
-    if (!q) throw new Error(j && j.message ? j.message : "sem dados");
+    // Tenta com dividends=true (cotação + proventos numa chamada só). Se essa chamada falhar — o que
+    // acontece com Fiagro/ativos onde o módulo de dividendos é recurso PAGO e derruba a resposta inteira
+    // no plano grátis — tenta de novo SÓ a cotação (sem o módulo), pra pelo menos recuperar o preço.
+    async function pedir(comDividendos) {
+      const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}` +
+        (comDividendos ? "?dividends=true" : "?") +
+        (token ? `&token=${encodeURIComponent(token)}` : "");
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const q = j && j.results && j.results[0];
+      if (!q) throw new Error(j && j.message ? j.message : "sem dados");
+      return q;
+    }
+    let q, comDiv = true;
+    try { q = await pedir(true); }
+    catch (e) { comDiv = false; q = await pedir(false); }
     const out = { quote: null, dividends: null };
     if (q.regularMarketPrice != null) {
       const prev = q.regularMarketPreviousClose != null ? q.regularMarketPreviousClose : q.regularMarketPrice;
       out.quote = { price: q.regularMarketPrice, prevClose: prev, name: q.longName || q.shortName || ticker, source: "brapi", updatedAt: Date.now() };
     }
-    out.dividends = parseBrapiCash(q);
+    if (comDiv) out.dividends = parseBrapiCash(q);
     return out;
   }
 
@@ -177,8 +187,8 @@ const Quotes = (() => {
   }
 
   // Busca várias; devolve { ok: {ticker: quote}, falhas: [ticker], dividends: {ticker: {list,...}} }.
-  // 1º tenta o brapi (cotação + dividendos numa chamada só, com o token do usuário); depois o HG em
-  // lote para o que faltar de cotação; por fim as reservas individuais.
+  // 1º tenta o brapi (cotação + dividendos numa chamada só, com o token do usuário); depois o HG
+  // POR TICKER para o que faltar de cotação; por fim as reservas individuais.
   async function fetchAll(tickers, token) {
     token = token != null ? token : tokenAtual();
     const ok = {}, dividends = {};
@@ -189,9 +199,15 @@ const Quotes = (() => {
         Object.assign(dividends, r.dividends);
       } catch (e) { /* segue pros fallbacks */ }
     }
+    // HG Brasil cobre FII e FIAGRO (ex.: AAZQ11, que o brapi grátis não traz). Consulta UM ticker por
+    // chamada (o multi-símbolo por vírgula costuma ser recurso pago e derrubava a chamada inteira),
+    // no máx. 3 em paralelo — assim cada ativo que faltou ganha sua própria tentativa no HG.
     const semCotacao = tickers.filter(t => !ok[t]);
     if (semCotacao.length) {
-      try { Object.assign(ok, await viaHGMany(semCotacao)); } catch (e) { /* segue */ }
+      const hg = await mapLimit(semCotacao, 3, async (t) => {
+        try { return { t, v: await viaHG1(t) }; } catch (e) { return { t, v: null }; }
+      });
+      for (const r of hg) if (r && r.v) ok[r.t] = r.v;
     }
     const restantes = tickers.filter(t => !ok[t]);
     const falhas = [];
