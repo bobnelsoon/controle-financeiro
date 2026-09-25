@@ -162,6 +162,19 @@ Padrão: cada mutação chama `Store.save()`; a UI re-renderiza com `App.render(
     que abre "Meses anteriores" + "Próximos meses (previsão)". Decisões do usuário: fixo = **só parcelas**
     (assinaturas recorrentes ficam pra depois); pedágio conta no variável; só quer ver se **estourou o
     previsto**, não categorias.
+  - **Fatura PREVISTA no fluxo/projeção** (`Store.faturaPrevistaTotal(ym)`, `faturaPrevistaRestante(ym)`,
+    `autoCartaoProjetado(ym)`, `cartaoDiaPrevisto(ym,map)`): a projeção do cartão deixa de contar só as
+    parcelas nos meses futuros e passa a considerar o **dia a dia previsto**, pra o "no fim do mês/ano" não
+    ficar otimista falso. Regra: **fatura prevista = fixo + o MAIOR entre (dia a dia real, previsto)**
+    (previsto = `cartaoDiaPrevisto` = média ponderada dos últimos 3 meses fechados). **Só vigente + futuros**
+    (`ym >= faturaVigenteYm`); passadas/fechadas = **real** (`faturaTotal`). **Auto-ajuste:** conforme o real
+    cresce ele substitui o previsto; se passar, acompanha o real; quando a fatura fecha (paga → `faturaVigenteYm`
+    avança) vira 100% real. ⚠️ **Separação crítica:** só a PROJEÇÃO usa o previsto — `projectedValue` e
+    `plannedValue` chamam `autoCartaoProjetado`; o **pagamento/saldo** (`effectiveCellValue`) continua no
+    `autoCartaoValue` REAL (não dá pra debitar previsto do saldo). Reflete na cascata, "Próximos meses"
+    (nota "fatura prevista"), "No fim de <mês>/<ano>", "A pagar". `receitaDespesaMes` (gráfico) segue no real
+    (`faturaTotal`). **UI Modelo 2** na fatura vigente do card cpv: barra `fixo + dia a dia real (sólido) +
+    previsto restante (listrado seg-fut)` — `prevGap = diaPrev − diaReal` quando `isAtual && diaPrev>diaReal`.
 
 - **Saldo em conta é automático e determinístico** (`Store.saldoContaAtual`): parte do valor informado
   (`settings.conta = { at, valor }`) e soma o que foi realizado **depois** da âncora `at`:
@@ -405,11 +418,19 @@ do ambiente bloqueia `github.io`; a publicação em si é automática do lado do
 
 ## Onde paramos (para continuar amanhã)
 
-**PUBLICADO** (linha `v19`, cache atual `202607211000`): tudo no ar pela `main`/GitHub Pages. O app é o
+**PUBLICADO** (linha `v19`, cache atual `202607212000`): tudo no ar pela `main`/GitHub Pages. O app é o
 **Gestão Pessoal** (guarda-chuva de controles: 💰 Financeiro + ⛽ Combustível) com tela inicial lançadora.
-Publicação por PR → merge (PRs #14–#90 mesclados nesta iteração). Próximas melhorias na mesma branch
+Publicação por PR → merge (PRs #14–#91 mesclados nesta iteração). Próximas melhorias na mesma branch
 `claude/project-updates-2r7rf9` (reiniciada a partir da `main` após cada merge) → novo PR → merge.
 O usuário já importou os dados reais dele no app (combustível + investimentos) e validou online.
+
+**Última melhoria (PUBLICADA, cache `202607212000`, PR #91):** **fatura prevista no fluxo.** A projeção do
+cartão passou a considerar o **dia a dia previsto** nos meses vigente+futuros (fatura prevista = fixo + o
+MAIOR entre dia a dia real e previsto), pra o "no fim do mês/ano" parar de mostrar um valor otimista falso
+que ignorava o gasto do dia a dia. Auto-ajuste: o real substitui o previsto conforme gasta; passou → segue o
+real; fatura fechada/paga → 100% real. ⚠️ Só a PROJEÇÃO usa previsto (`projectedValue`/`plannedValue` →
+`autoCartaoProjetado`); pagamento/saldo seguem REAIS (`effectiveCellValue`→`autoCartaoValue`). UI: barra
+Modelo 2 na fatura vigente (real sólido + previsto listrado). Ver convenção "Fatura PREVISTA no fluxo".
 
 **Última melhoria (PUBLICADA, cache `202607211000`, PR #90):** **cotação automática de Fiagro (AAZQ11).**
 Diagnóstico (usuário confirmou: token do brapi cadastrado, só o AAZQ11 falha): brapi grátis não cobre
