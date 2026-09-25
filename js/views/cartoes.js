@@ -141,6 +141,10 @@ const ViewCartoes = (() => {
     const segDia = l.futuro ? "seg-fut" : (l.status === "over" ? "seg-o" : l.status === "under" ? "seg-u" : "seg-p");
     const fixoSeg = l.fixo > 0 ? `<span class="cpv-seg seg-fix" style="width:${pct(l.fixo)}%"></span>` : "";
     const diaSeg = (l.diaReal > 0) ? `<span class="cpv-seg ${segDia}" style="width:${pct(l.diaReal)}%"></span>` : "";
+    // Modelo 2: na fatura VIGENTE, mostra o "dia a dia previsto ainda não gasto" como faixa listrada
+    // depois do real (o real sólido vai "comendo" essa faixa conforme você gasta). Só quando real < previsto.
+    const prevGap = (l.isAtual && l.diaPrev != null && l.diaPrev > l.diaReal) ? (l.diaPrev - l.diaReal) : 0;
+    const prevSeg = prevGap > 0 ? `<span class="cpv-seg seg-fut" title="dia a dia previsto (ainda não gasto)" style="width:${pct(prevGap)}%"></span>` : "";
     const marker = (!l.futuro && l.totalPrev != null) ? `<span class="cpv-mark" style="left:${pct(l.totalPrev)}%"></span>` : "";
     let status, scls = l.status;
     if (l.futuro) { status = `~${U.brl(l.total)}`; scls = "nobase"; }
@@ -163,7 +167,7 @@ const ViewCartoes = (() => {
     return `
       <div class="cpv-row">
         <div class="cpv-top"><span class="cpv-name">${nomeMes}${tag}</span><span class="cpv-status ${scls}">${status}</span></div>
-        <div class="cpv-track">${fixoSeg}${diaSeg}${marker}</div>
+        <div class="cpv-track">${fixoSeg}${diaSeg}${prevSeg}${marker}</div>
         <div class="cpv-nums"><span>${numL}</span><span>${numR}</span></div>
       </div>`;
   }

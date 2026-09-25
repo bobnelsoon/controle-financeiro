@@ -311,8 +311,44 @@ const Store = (() => {
   }
 
   // Valor automático do item "Cartão (fatura)": só o que ainda FALTA pagar no mês, negativo.
+  // ⚠️ REAL — usado no PAGAMENTO/SALDO (effectiveCellValue). A projeção usa autoCartaoProjetado.
   function autoCartaoValue(ymStr) {
     const rest = faturaRestante(ymStr, null);
+    return rest !== 0 ? -rest : null;
+  }
+
+  // ---------- Fatura PREVISTA (só projeção): fixo + o MAIOR entre (dia a dia real, previsto) ----------
+  // Usada só na PROJEÇÃO (fluxo/dashboard/"no fim de"), NUNCA no pagamento/saldo (que são reais — o
+  // effectiveCellValue segue no autoCartaoValue). Meses passados/fechados (< fatura vigente) = valor REAL;
+  // vigente e futuros = fixo + max(diaReal, diaPrevisto). Previsto = média ponderada dos últimos 3 meses
+  // fechados (mesma lógica de cartaoPrevistoRealizado). Auto-ajuste: conforme o real cresce ele "substitui"
+  // o previsto; se passar do previsto, a fatura acompanha o real; quando a fatura fecha, vira 100% real.
+  function cartaoDiaPrevisto(ymStr, map) {
+    map = map || cartaoFaturaPorMes();
+    const mesVig = faturaVigenteYm();
+    const ants = Object.keys(map).filter(x => x < ymStr && x < mesVig && map[x].dia > 0).sort().slice(-3);
+    if (!ants.length) return null;
+    let soma = 0, w = 0;
+    ants.forEach((ym, i) => { const p = i + 1; soma += (map[ym].dia || 0) * p; w += p; });
+    return w ? Math.round(soma / w * 100) / 100 : null;
+  }
+  function faturaPrevistaTotal(ymStr) {
+    const real = faturaTotal(ymStr, null);
+    if (ymStr < faturaVigenteYm()) return real; // fatura passada/fechada → real
+    const map = cartaoFaturaPorMes();
+    const f = map[ymStr] || { fixo: 0, dia: 0 };
+    const diaPrev = cartaoDiaPrevisto(ymStr, map);
+    if (diaPrev == null) return real; // sem base de previsão ainda → real
+    const diaConsiderado = Math.max(f.dia || 0, diaPrev);
+    return Math.round((f.fixo + diaConsiderado) * 100) / 100;
+  }
+  function faturaPrevistaRestante(ymStr) {
+    const pago = faturasPagasTotal(ymStr);
+    return Math.max(0, Math.round((faturaPrevistaTotal(ymStr) - pago) * 100) / 100);
+  }
+  // Valor do item "Cartão (fatura)" para PROJEÇÃO (usa a prevista). Pagamento/saldo usa autoCartaoValue.
+  function autoCartaoProjetado(ymStr) {
+    const rest = faturaPrevistaRestante(ymStr);
     return rest !== 0 ? -rest : null;
   }
 
@@ -470,7 +506,7 @@ const Store = (() => {
     const c = getCell(item.id, ymStr);
     if (c && c.value != null) return c.value;
     if (item.autoCartao) {
-      const v = autoCartaoValue(ymStr);
+      const v = autoCartaoProjetado(ymStr);
       if (v != null) return v;
     }
     if (!inRangeRaw(item, ymStr)) return null;
@@ -485,7 +521,8 @@ const Store = (() => {
     if (c && c.status && c.status !== "PENDENTE") return 0;
     if (c && c.value != null) return c.value;
     if (item.autoCartao) {
-      const v = autoCartaoValue(ymStr);
+      // PROJEÇÃO usa a fatura PREVISTA (fixo + dia a dia previsto); o pagamento/saldo usa o real.
+      const v = autoCartaoProjetado(ymStr);
       if (v != null) return v;
     }
     if (!inRangeRaw(item, ymStr)) return null;
@@ -1194,7 +1231,7 @@ const Store = (() => {
     saldoAcumuladoSerie,
     addTransaction, removeTransaction, txDoMes,
     cardTxDoMes, faturaTotal, addCardTx, removeCardTx, removeCardTxIds, cardTxParcelas, faturaDaCompra,
-    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, cartaoPrevistoRealizado, loansAReceberMes, janelaPagamento,
+    faturaPaga, pagarFatura, desfazerFatura, faturasPagasTotal, faturaRestante, faturaVigenteYm, cartaoPrevistoRealizado, faturaPrevistaTotal, faturaPrevistaRestante, cartaoDiaPrevisto, loansAReceberMes, janelaPagamento,
     inv, rvTotal, rfTotal, quoteFor, setQuoteManual, removeQuoteManual, carteiraRentabilidade, rentabilidadeSerie, saveQuotes, saveDividends, dividendosResumo, divSince, setDivSince, dividendosManuais, addDividendoManual, removeDividendoManual, clearDividendos, brapiToken, setBrapiToken, aportesDoAno, receitaDespesaSerie, fluxoCascataSerie,
     registrarAporte, estornarAporte, estornarAporteManual, resetAporteBaseline,
     despesasPorCategoria, catName, accName,

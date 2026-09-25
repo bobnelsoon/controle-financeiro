@@ -444,7 +444,7 @@ const ViewDashboard = (() => {
         tb.appendChild(det);
       }
       vencEl.appendChild(tbl);
-      vencEl.appendChild(U.el(`<div class="muted" style="font-size:11.5px;margin-top:8px">Valores em R$ (sem centavos). Entra = receitas + empréstimo · Sai = despesas + fatura do cartão · Saldo fim = saldo início + entra − sai (encadeia mês a mês). Toque no mês pra ver os lançamentos.</div>`));
+      vencEl.appendChild(U.el(`<div class="muted" style="font-size:11.5px;margin-top:8px">Valores em R$ (sem centavos). Entra = receitas + empréstimo · Sai = despesas + fatura do cartão (prevista: parcelas + dia a dia estimado) · Saldo fim = saldo início + entra − sai (encadeia mês a mês). Toque no mês pra ver os lançamentos.</div>`));
     }
   }
 
